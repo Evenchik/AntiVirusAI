@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.2.2 — Browser content-root repair
+
+- Browser Console now uses the executable directory as its Web content root, so the published `wwwroot` assets and `index.html` are served regardless of the launcher working directory.
+- Startup verifies that `wwwroot\index.html` is present and writes a clear startup-log error instead of opening a 404 endpoint when published assets are missing.
+
 ## 4.2.1 — Startup and security hardening
 
 - `Start ArmorAV.cmd` now offers `1` CLI and `2` Browser Console, validates the locally built version and rebuilds a stale selected executable.

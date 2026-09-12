@@ -43,8 +43,18 @@ internal static class Program
         try { if (File.Exists(runningUrlPath)) File.Delete(runningUrlPath); }
         catch { }
 
+        var contentRoot = AppContext.BaseDirectory;
+        var indexPath = Path.Combine(contentRoot, "wwwroot", "index.html");
+        if (!File.Exists(indexPath))
+            throw new FileNotFoundException("Browser Console assets are missing. Rebuild ArmorAV with Start ArmorAV.cmd.", indexPath);
+
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
-        var builder = WebApplication.CreateBuilder(args);
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = args,
+            ContentRootPath = contentRoot,
+            WebRootPath = Path.Combine(contentRoot, "wwwroot")
+        });
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, requestedPort ?? 0));
         builder.Services.AddSingleton<ScanJobs>();
         var app = builder.Build();

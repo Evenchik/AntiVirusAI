@@ -16,7 +16,7 @@ namespace ArmorAV
     public static class Product
     {
         public const string Name = "ArmorAV";
-        public const string Version = "4.2.1";
+        public const string Version = "4.2.2";
         public const string Engine = "ArmorAV Static Engine";
         public const string Banner = "ArmorAV static malware scanner";
     }
