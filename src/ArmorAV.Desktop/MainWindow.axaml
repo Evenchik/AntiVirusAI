@@ -42,7 +42,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="14">
+    <Grid Grid.Row="2" RowDefinitions="Auto,*">
       <Border Background="#172231" BorderBrush="#26384E" BorderThickness="1" CornerRadius="10" Padding="18">
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Spacing="5">
@@ -53,7 +53,7 @@
         </Grid>
       </Border>
 
-      <Border Grid.Row="1" Background="#172231" BorderBrush="#26384E" BorderThickness="1" CornerRadius="10" Padding="8">
+      <Border Grid.Row="1" Background="#172231" BorderBrush="#26384E" BorderThickness="1" CornerRadius="10" Padding="8" Margin="0,14,0,0">
         <Grid RowDefinitions="Auto,*">
           <Grid Margin="10,8,10,10" ColumnDefinitions="*,Auto">
             <TextBlock Text="Результаты" FontSize="16" FontWeight="SemiBold" />
