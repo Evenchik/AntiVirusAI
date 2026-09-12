@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.2.3 — Object-picker redesign
+
+- Rebuilt the Browser Console interface around an explicit two-step native dropdown selector: location first, then a file or folder from that location.
+- Replaced the modal file browser and editable path field with current-folder navigation, an up-level control, clear actions for using the selected object or current folder, and a read-only selected-target summary.
+- Reworked layout, typography, results, options, quarantine and report views for a responsive, lower-noise interface.
+- The Windows launcher now rebuilds Browser Console when any `wwwroot` asset changes.
+
 ## 4.2.2 — Browser content-root repair
 
 - Browser Console now uses the executable directory as its Web content root, so the published `wwwroot` assets and `index.html` are served regardless of the launcher working directory.

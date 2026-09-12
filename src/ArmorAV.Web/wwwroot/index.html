@@ -3,49 +3,78 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1020">
-  <title>ArmorAV — Local Security Console</title>
+  <meta name="theme-color" content="#101827">
+  <title>ArmorAV — локальная проверка</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="ambient ambient-one"></div>
-  <div class="ambient ambient-two"></div>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-mark">A</div><div><strong>ArmorAV</strong><span>LOCAL SECURITY</span></div></div>
-      <div class="protection"><i></i><span>Движок готов</span></div>
-      <nav>
-        <button class="nav-item active" data-view="overview"><span>◈</span>Обзор</button>
-        <button class="nav-item" data-view="scan"><span>⌕</span>Проверка</button>
-        <button class="nav-item" data-view="quarantine"><span>▣</span>Карантин</button>
-        <button class="nav-item" data-view="reports"><span>⇩</span>Отчёты</button>
-      </nav>
-      <div class="sidebar-footer"><div class="local-note"><span class="dot"></span><div><b>Только локально</b><small>Файлы не загружаются в интернет</small></div></div><button class="exit-button" id="stop-app">Завершить</button></div>
-    </aside>
+  <header class="app-header">
+    <a class="brand" href="#overview" aria-label="ArmorAV">
+      <span class="brand-shield">A</span>
+      <span><b>ArmorAV</b><small>LOCAL SCANNER</small></span>
+    </a>
+    <nav class="navigation" aria-label="Разделы">
+      <button class="nav-item active" data-view="overview">Обзор</button>
+      <button class="nav-item" data-view="scan">Проверка</button>
+      <button class="nav-item" data-view="quarantine">Карантин</button>
+      <button class="nav-item" data-view="reports">Отчёты</button>
+    </nav>
+    <div class="header-status"><span class="status-dot"></span><span id="live-status">Подключение…</span></div>
+  </header>
 
-    <main>
-      <header class="topbar"><div><p class="eyebrow" id="page-eyebrow">ЗАЩИТА УСТРОЙСТВА</p><h1 id="page-title">Панель безопасности</h1></div><div class="top-actions"><span class="live-status" id="live-status"><i></i>Готов к проверке</span><button class="button button-primary" id="header-scan">Новая проверка <b>→</b></button></div></header>
+  <main class="content">
+    <section class="view active" id="overview-view">
+      <div class="page-intro">
+        <div><p class="eyebrow">ЛОКАЛЬНЫЙ СТАТИЧЕСКИЙ АНАЛИЗ</p><h1>Проверяйте файлы без отправки в интернет</h1><p>ArmorAV использует сигнатуры, структурный анализ и эвристики. Все выбранные объекты остаются на этом компьютере.</p></div>
+        <button class="button primary" id="hero-scan">Начать проверку <span>→</span></button>
+      </div>
+      <section class="health-card">
+        <div class="health-mark">✓</div>
+        <div><p class="eyebrow">СОСТОЯНИЕ ДВИЖКА</p><h2 id="hero-title">Готов к проверке</h2><p>Локальный сервис запущен. Выберите файл или папку из выпадающего списка.</p></div>
+      </section>
+      <div class="metric-grid">
+        <article><span>СТАТУС</span><strong id="metric-status">Готов</strong><small>движок активен</small></article>
+        <article><span>ПРОВЕРЕНО</span><strong id="metric-files">—</strong><small>объектов в последнем сеансе</small></article>
+        <article><span>УГРОЗЫ</span><strong id="metric-threats">—</strong><small>подтверждённых обнаружений</small></article>
+        <article><span>ВРЕМЯ</span><strong id="metric-duration">—</strong><small>последний сеанс</small></article>
+      </div>
+      <section class="panel recent-panel">
+        <div class="section-heading"><div><p class="eyebrow">ПОСЛЕДНИЙ СЕАНС</p><h2>Результаты</h2><p id="recent-caption">Запустите первую проверку, чтобы увидеть сводку.</p></div><button class="button quiet" data-open-view="scan">Открыть проверку</button></div>
+        <div class="empty-state" id="recent-empty"><span>◌</span><p>Здесь появятся результаты завершённой проверки.</p></div>
+        <div class="recent-list hidden" id="recent-list"></div>
+      </section>
+    </section>
 
-      <section class="view active" id="overview-view">
-        <div class="hero-card"><div><p class="eyebrow accent">ЛОКАЛЬНЫЙ АНАЛИЗ</p><h2 id="hero-title">Устройство готово к проверке</h2><p>ArmorAV использует сигнатуры, структурный анализ и эвристики. Проверяемые файлы остаются на этом компьютере.</p><button class="button button-primary" id="hero-scan">Запустить проверку <b>→</b></button></div><div class="shield"><div class="shield-inner">✓</div><span>ARMOR<br>ACTIVE</span></div></div>
-        <div class="metric-grid"><article><span>СТАТУС ДВИЖКА</span><strong id="metric-status">Готов</strong><small>локальный анализ включён</small></article><article><span>ПРОВЕРЕНО</span><strong id="metric-files">—</strong><small>файлов в последнем сеансе</small></article><article><span>ПОДТВЕРЖДЕНО</span><strong id="metric-threats">—</strong><small>угроз обнаружено</small></article><article><span>ВРЕМЯ СЕАНСА</span><strong id="metric-duration">—</strong><small>последняя проверка</small></article></div>
-        <section class="panel recent-panel"><div class="panel-heading"><div><h3>Последние результаты</h3><p id="recent-caption">Проведите первую проверку, чтобы увидеть сводку.</p></div><button class="button button-subtle" data-open-view="scan">Открыть проверку</button></div><div class="empty-state" id="recent-empty"><div>◈</div><p>Результаты последних проверок будут показаны здесь.</p></div><div class="recent-list hidden" id="recent-list"></div></section>
+    <section class="view" id="scan-view">
+      <div class="section-heading page-heading"><div><p class="eyebrow">НОВАЯ ПРОВЕРКА</p><h1>Выберите объект</h1><p>Сначала выберите расположение, затем файл или папку в выпадающем списке.</p></div><span class="local-badge">● Только на этом компьютере</span></div>
+      <section class="panel picker-panel">
+        <div class="picker-title"><span class="step">1</span><div><h2>Расположение</h2><p>Выберите начальную папку.</p></div></div>
+        <label class="field-label" for="location-select">Быстрый выбор</label>
+        <select class="large-select" id="location-select" disabled><option>Подготовка списка папок…</option></select>
+
+        <div class="picker-title object-title"><span class="step">2</span><div><h2>Файл или папка</h2><p id="folder-caption">Выберите объект из текущей папки.</p></div></div>
+        <div class="folder-bar"><button class="folder-up" id="parent-folder" type="button" title="На уровень выше">↑</button><output id="browser-folder">—</output></div>
+        <label class="field-label" for="object-select">Содержимое папки</label>
+        <select class="large-select object-select" id="object-select" disabled><option>Сначала выберите расположение</option></select>
+        <div class="object-actions"><button class="button quiet" id="open-selected" type="button" disabled>Открыть выбранную папку</button><button class="button quiet" id="use-current-folder" type="button" disabled>Проверить эту папку</button><button class="button dark" id="use-selected-object" type="button" disabled>Использовать объект</button></div>
+
+        <div class="selected-target"><span>ВЫБРАНО ДЛЯ ПРОВЕРКИ</span><input id="target-path" readonly value="" placeholder="Файл или папка ещё не выбраны"><i id="target-kind">—</i></div>
+        <div class="scan-actions"><button class="button primary large" id="start-scan" type="button">Запустить анализ <span>→</span></button><span id="scan-status">Выберите файл или папку выше.</span></div>
       </section>
 
-      <section class="view" id="scan-view">
-        <div class="scan-layout"><div class="scan-main"><section class="panel target-panel"><p class="eyebrow accent">НОВАЯ ПРОВЕРКА</p><h2>Что нужно проверить?</h2><p class="muted">Выберите отдельный файл или папку. В браузере доступен безопасный локальный проводник.</p><div class="target-input"><input id="target-path" autocomplete="off" placeholder="Выберите файл или папку"><button id="browse-button" title="Открыть проводник">Обзор</button></div><div class="quick-paths"><button data-quick="downloads">Загрузки</button><button data-quick="documents">Документы</button><button data-quick="desktop">Рабочий стол</button></div><div class="scan-actions"><button class="button button-primary button-large" id="start-scan">Начать анализ <b>→</b></button><span id="scan-status">Выберите объект для проверки</span></div></section>
-          <section class="panel result-panel"><div class="panel-heading"><div><h3>Результаты анализа</h3><p id="result-caption">Результаты появятся после завершения проверки.</p></div><div class="spinner hidden" id="spinner"></div></div><div class="table-header"><span>ВЕРДИКТ</span><span>БАЛЛ</span><span>ТИП</span><span>ОБЪЕКТ</span></div><div class="result-list" id="result-list"><div class="empty-state compact"><div>⌕</div><p>Пока нет данных для отображения.</p></div></div></section></div>
-          <aside class="scan-aside"><section class="panel options-panel"><h3>Параметры</h3><label class="switch-line"><input type="checkbox" id="cache-enabled" checked><span class="switch"></span><span><b>Локальный кэш</b><small>ускоряет повторные проверки</small></span></label><label class="switch-line"><input type="checkbox" id="quarantine-enabled"><span class="switch"></span><span><b>Карантин Confirmed</b><small>только подтверждённые угрозы</small></span></label><label class="select-line">Глубина папок<select id="max-depth"><option value="5">5 уровней</option><option value="10" selected>10 уровней</option><option value="20">20 уровней</option></select></label><label class="select-line">Параллельность<select id="thread-count"><option value="1">1 поток</option><option value="2">2 потока</option><option value="4" selected>4 потока</option><option value="8">8 потоков</option></select></label></section><section class="panel details-panel"><p class="eyebrow">ДЕТАЛИ</p><h3 id="details-title">Выберите результат</h3><p id="details-body">Выберите строку после проверки, чтобы увидеть сигнатуры, хэш и объяснение вердикта.</p><div id="details-findings"></div></section></aside></div>
-      </section>
+      <div class="scan-bottom">
+        <section class="panel result-panel"><div class="section-heading"><div><p class="eyebrow">РЕЗУЛЬТАТЫ</p><h2>Анализ</h2><p id="result-caption">Результаты появятся после завершения проверки.</p></div><div class="spinner hidden" id="spinner"></div></div><div class="table-header"><span>ВЕРДИКТ</span><span>БАЛЛ</span><span>ТИП</span><span>ОБЪЕКТ</span></div><div class="result-list" id="result-list"><div class="empty-state compact"><span>⌕</span><p>Данных пока нет.</p></div></div></section>
+        <aside class="scan-aside"><section class="panel options-panel"><p class="eyebrow">ПАРАМЕТРЫ</p><h2>Настройка анализа</h2><label class="switch-line"><input type="checkbox" id="cache-enabled" checked><span class="switch"></span><span><b>Локальный кэш</b><small>ускоряет повторную проверку неизменённых файлов</small></span></label><label class="switch-line"><input type="checkbox" id="quarantine-enabled"><span class="switch"></span><span><b>Карантин Confirmed</b><small>перемещать только подтверждённые угрозы</small></span></label><label class="select-line">Глубина обхода<select id="max-depth"><option value="5">5 уровней</option><option value="10" selected>10 уровней</option><option value="20">20 уровней</option></select></label><label class="select-line">Параллельность<select id="thread-count"><option value="1">1 поток</option><option value="2">2 потока</option><option value="4" selected>4 потока</option><option value="8">8 потоков</option></select></label></section><section class="panel details-panel"><p class="eyebrow">ДЕТАЛИ ВЕРДИКТА</p><h2 id="details-title">Выберите результат</h2><p id="details-body">После проверки нажмите строку результата, чтобы увидеть хэш, сигнатуры и объяснение.</p><div id="details-findings"></div></section></aside>
+      </div>
+    </section>
 
-      <section class="view" id="quarantine-view"><section class="hero-mini"><div><p class="eyebrow accent">ЗАЩИЩЁННОЕ ХРАНИЛИЩЕ</p><h2>Карантин</h2><p>Здесь находятся только файлы, помещённые в карантин по вашему явному выбору.</p></div><button class="button button-subtle" id="refresh-quarantine">Обновить</button></section><section class="panel quarantine-panel"><div class="panel-heading"><div><h3>Объекты в карантине</h3><p id="quarantine-caption">Загрузка списка…</p></div></div><div id="quarantine-list" class="quarantine-list"></div></section></section>
+    <section class="view" id="quarantine-view"><div class="section-heading page-heading"><div><p class="eyebrow">ЗАЩИЩЁННОЕ ХРАНИЛИЩЕ</p><h1>Карантин</h1><p>Восстанавливайте объекты только если уверены в их безопасности.</p></div><button class="button quiet" id="refresh-quarantine">Обновить</button></div><section class="panel quarantine-panel"><p id="quarantine-caption">Загрузка списка…</p><div id="quarantine-list" class="quarantine-list"></div></section></section>
 
-      <section class="view" id="reports-view"><section class="hero-mini"><div><p class="eyebrow accent">ЭКСПОРТ РЕЗУЛЬТАТОВ</p><h2>Отчёты</h2><p>Сохраняйте результаты последней проверки для анализа или CI/CD.</p></div></section><div class="report-grid"><article class="panel report-card"><span>JSON</span><h3>Полные данные</h3><p>Машинно-читаемый отчёт со всеми срабатываниями.</p><button data-report="json" disabled>Скачать JSON</button></article><article class="panel report-card"><span>HTML</span><h3>Наглядный отчёт</h3><p>Готовая страница для просмотра в браузере.</p><button data-report="html" disabled>Скачать HTML</button></article><article class="panel report-card"><span>CSV</span><h3>Таблица</h3><p>Краткая сводка для Excel и других систем.</p><button data-report="csv" disabled>Скачать CSV</button></article><article class="panel report-card"><span>SARIF 2.1</span><h3>CI и security tools</h3><p>Стандартный формат интеграции с пайплайнами.</p><button data-report="sarif" disabled>Скачать SARIF</button></article></div></section>
-    </main>
-  </div>
+    <section class="view" id="reports-view"><div class="section-heading page-heading"><div><p class="eyebrow">ЭКСПОРТ</p><h1>Отчёты</h1><p>Скачайте результат последней завершённой проверки.</p></div></div><div class="report-grid"><article class="panel report-card"><span>JSON</span><h2>Полные данные</h2><p>Все результаты и срабатывания для обработки инструментами.</p><button data-report="json" disabled>Скачать JSON</button></article><article class="panel report-card"><span>HTML</span><h2>Наглядный отчёт</h2><p>Самостоятельная страница для просмотра в браузере.</p><button data-report="html" disabled>Скачать HTML</button></article><article class="panel report-card"><span>CSV</span><h2>Таблица</h2><p>Краткая сводка, безопасная для открытия в Excel.</p><button data-report="csv" disabled>Скачать CSV</button></article><article class="panel report-card"><span>SARIF 2.1</span><h2>Security tooling</h2><p>Формат для CI/CD и средств анализа безопасности.</p><button data-report="sarif" disabled>Скачать SARIF</button></article></div></section>
+  </main>
 
-  <dialog id="browser-dialog"><div class="dialog-card"><div class="dialog-header"><div><p class="eyebrow accent">ЛОКАЛЬНЫЙ ПРОВОДНИК</p><h3>Выберите объект</h3></div><button class="icon-button" id="close-browser">×</button></div><div class="path-bar"><button id="parent-folder">↑</button><input id="browser-path"><button id="open-path">Открыть</button></div><div class="browser-note" id="browser-note">Загрузка…</div><div class="browser-list" id="browser-list"></div></div></dialog>
-  <div class="toast hidden" id="toast"></div>
+  <button class="stop-button" id="stop-app" type="button">Завершить ArmorAV</button>
+  <div class="toast hidden" id="toast" role="status"></div>
   <script src="/app.js"></script>
 </body>
 </html>
