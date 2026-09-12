@@ -3,10 +3,7 @@ using System.IO;
 
 namespace ArmorAV
 {
-    /// <summary>
-    /// Centralizes the per-user location used by ArmorAV for cache and quarantine data.
-    /// The executable directory is deliberately not used: installed applications are often read-only.
-    /// </summary>
+
     public static class ArmorAVPaths
     {
         public static string DataDirectory
@@ -26,7 +23,6 @@ namespace ArmorAV
         }
     }
 
-    /// <summary>Settings shared by the command line and desktop applications.</summary>
     public sealed class ScanRequest
     {
         public string Path { get; set; } = "";
@@ -38,10 +34,6 @@ namespace ArmorAV
         public string? DataDirectory { get; set; }
     }
 
-    /// <summary>
-    /// The application-facing scanning API. Both interfaces call this class and therefore use
-    /// the same signatures, limits, scoring policy, quarantine and reports.
-    /// </summary>
     public static class ArmorAVService
     {
         public static ScanReport Scan(ScanRequest request)

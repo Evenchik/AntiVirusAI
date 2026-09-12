@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# Restores, builds and runs ArmorAV's dependency-free smoke tests.
 set -eu
 
 if [ -x "${DOTNET_ROOT:-$HOME/.dotnet}/dotnet" ]; then

@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 
 namespace ArmorAV
 {
-    #region product
 
     public static class Product
     {
@@ -20,10 +19,6 @@ namespace ArmorAV
         public const string Engine = "ArmorAV Static Engine";
         public const string Banner = "ArmorAV static malware scanner";
     }
-
-    #endregion
-
-    #region model
 
     public enum Verdict { Clean, Suspicious, Confirmed }
 
@@ -139,10 +134,6 @@ namespace ArmorAV
         public string? SarifPath;
         public bool ShowStats;
     }
-
-    #endregion
-
-    #region signatures
 
     public sealed class PatternSignature
     {
@@ -570,10 +561,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region composite rules
-
     public sealed class CompositeRule
     {
         public string Name = "";
@@ -674,10 +661,6 @@ namespace ArmorAV
             },
         };
     }
-
-    #endregion
-
-    #region rule engine
 
     public sealed class RuleString
     {
@@ -883,10 +866,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region lnk and containers
-
     public static class LnkAnalyzer
     {
         public static List<DeobHit> Analyze(byte[] data, int count)
@@ -1057,10 +1036,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region self protection
-
     public static class Obf
     {
         private const byte Key = 0x5A;
@@ -1109,10 +1084,6 @@ namespace ArmorAV
             return sb.ToString();
         }
     }
-
-    #endregion
-
-    #region trust model
 
     public enum TrustLevel { Untrusted, Neutral, SystemPath, Signed, SignedSystem, Allowlisted }
 
@@ -1243,10 +1214,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region evidence classes
-
     public enum EvidenceClass { Structural, Contextual, Behavioural, Definitive }
 
     public static class EvidencePolicy
@@ -1290,10 +1257,6 @@ namespace ArmorAV
             return adjusted < 0 ? 0 : adjusted;
         }
     }
-
-    #endregion
-
-    #region normalization
 
     public static class Normalizer
     {
@@ -1428,10 +1391,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region attack map
-
     public static class AttackMap
     {
         private static readonly Dictionary<string, string[]> Techniques = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
@@ -1484,10 +1443,6 @@ namespace ArmorAV
             return set.ToList();
         }
     }
-
-    #endregion
-
-    #region byte patterns
 
     public sealed class BytePattern
     {
@@ -1614,10 +1569,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region rich header
-
     public static class RichHeaderParser
     {
         public static void Populate(byte[] data, PeImage pe)
@@ -1691,10 +1642,6 @@ namespace ArmorAV
             }
         }
     }
-
-    #endregion
-
-    #region dotnet metadata
 
     public sealed class DotNetInfo
     {
@@ -1852,10 +1799,6 @@ namespace ArmorAV
             return hits;
         }
     }
-
-    #endregion
-
-    #region ole compound file
 
     public sealed class OleEntry
     {
@@ -2220,10 +2163,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region resource walker
-
     public static class ResourceWalker
     {
         private static ushort U16(byte[] b, int o) => (ushort)(b[o] | (b[o + 1] << 8));
@@ -2290,10 +2229,6 @@ namespace ArmorAV
             }
         }
     }
-
-    #endregion
-
-    #region carving and advanced deobfuscation
 
     public static class Carver
     {
@@ -2492,10 +2427,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region mail
-
     public static class MailAnalyzer
     {
         public static bool LooksLikeMail(byte[] head, int count)
@@ -2594,10 +2525,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region scan cache
-
     public sealed class ScanCache
     {
         private sealed class Entry
@@ -2676,10 +2603,6 @@ namespace ArmorAV
             catch (UnauthorizedAccessException) { }
         }
     }
-
-    #endregion
-
-    #region util
 
     public static class Util
     {
@@ -2775,10 +2698,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region hashing
-
     public sealed class HashTriple
     {
         public string Md5 = "";
@@ -2827,10 +2746,6 @@ namespace ArmorAV
             };
         }
     }
-
-    #endregion
-
-    #region aho corasick
 
     public sealed class AhoCorasick
     {
@@ -2913,10 +2828,6 @@ namespace ArmorAV
             }
         }
     }
-
-    #endregion
-
-    #region pattern engine
 
     public sealed class PatternHit
     {
@@ -3016,10 +2927,6 @@ namespace ArmorAV
             return -1;
         }
     }
-
-    #endregion
-
-    #region file type
 
     public sealed class TypeInfo
     {
@@ -3146,10 +3053,6 @@ namespace ArmorAV
             return ExecExt.Contains(Path.GetExtension(name).ToLowerInvariant());
         }
     }
-
-    #endregion
-
-    #region pe parser
 
     public sealed class PeSection
     {
@@ -3481,10 +3384,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region shellcode heuristics
-
     public static class ShellcodeHeuristics
     {
         private static readonly byte[] PebWalk64 = { 0x65, 0x48, 0x8B, 0x04, 0x25, 0x60, 0x00, 0x00, 0x00 };
@@ -3516,10 +3415,6 @@ namespace ArmorAV
             return hits;
         }
     }
-
-    #endregion
-
-    #region deobfuscation
 
     public sealed class DeobHit
     {
@@ -3898,10 +3793,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region document analysis
-
     public static class DocumentAnalyzer
     {
         public static List<DeobHit> AnalyzePdf(byte[] data, int count)
@@ -3966,10 +3857,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region fuzzy
-
     public static class FuzzyFingerprint
     {
         public const int NGramSize = 8;
@@ -4015,10 +3902,6 @@ namespace ArmorAV
             return union == 0 ? 0.0 : (double)inter / union;
         }
     }
-
-    #endregion
-
-    #region quarantine
 
     public sealed class QuarantineRecord
     {
@@ -4191,7 +4074,7 @@ namespace ArmorAV
                 bool committed = false;
                 try
                 {
-                    // Refuse to quarantine a different file if the path changed after scanning.
+
                     var plain = File.ReadAllBytes(path);
                     var actual = Util.ToHex(SHA256.HashData(plain));
                     if (!string.Equals(actual, h.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -4211,7 +4094,6 @@ namespace ArmorAV
                     WriteBytesAtomically(blobPath, blob);
                     WriteTextAtomically(metaPath, Metadata(rec));
 
-                    // A final hash check prevents deleting a file replaced during the scan/quarantine window.
                     var beforeDelete = Hasher.FromFile(path).Sha256;
                     if (!string.Equals(beforeDelete, h.Sha256, StringComparison.OrdinalIgnoreCase))
                         throw new IOException("file changed before quarantine could be committed; source was not deleted");
@@ -4223,7 +4105,7 @@ namespace ArmorAV
                 }
                 finally
                 {
-                    // Do not leave a misleading quarantine record if the source was not safely removed.
+
                     if (!committed)
                     {
                         if (File.Exists(blobPath)) File.Delete(blobPath);
@@ -4349,10 +4231,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region scoring
-
     public static class Scoring
     {
         public const int WeakCap = 15;
@@ -4380,10 +4258,6 @@ namespace ArmorAV
             return Verdict.Clean;
         }
     }
-
-    #endregion
-
-    #region engine
 
     public sealed class ScanEngine
     {
@@ -5074,10 +4948,6 @@ namespace ArmorAV
         }
     }
 
-    #endregion
-
-    #region reporting
-
     public static class Reporter
     {
         public static void Console_(ScanReport report, Options opt)
@@ -5323,7 +5193,7 @@ namespace ArmorAV
             sb.Append("ul{margin:0;padding-left:18px}li{margin-bottom:3px}");
             sb.Append(".sev{display:inline-block;border-radius:4px;padding:0 6px;font-size:11px;margin-right:6px}");
             sb.Append(".Critical{background:#5c1a1a;color:#ff9d9d}.High{background:#5c3a12;color:#ffc07a}.Medium{background:#4a4413;color:#f2e28a}.Low{background:#1e3a4a;color:#95cfe8}.Info{background:#25303c;color:#a9b6c4}");
-            
+
             sb.Append("</style></head><body>");
             sb.Append("<h1>").Append(Product.Name).Append(" scan report</h1>");
             sb.Append("<div class=\"sub\">").Append(Product.Engine).Append(" v").Append(Product.Version)
@@ -5395,10 +5265,6 @@ namespace ArmorAV
             return sb.ToString();
         }
     }
-
-    #endregion
-
-    #region entry
 
     public static class Program
     {
@@ -5558,5 +5424,4 @@ namespace ArmorAV
         }
     }
 
-    #endregion
 }

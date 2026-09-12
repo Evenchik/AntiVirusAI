@@ -94,11 +94,24 @@ tests/ArmorAV.SmokeTests  smoke-тесты без тестового фрейм�
 scripts/               установка SDK, сборка и запуск
 ```
 
-## Сборка релизов
+## Windows EXE и сборка релизов
+
+Чтобы получить два самостоятельных Windows-приложения, не требующих установленного .NET Runtime на целевом ПК:
 
 ```bash
-dotnet publish src/ArmorAV.Cli/ArmorAV.Cli.csproj -c Release -r win-x64 --self-contained true
-dotnet publish src/ArmorAV.Desktop/ArmorAV.Desktop.csproj -c Release -r win-x64 --self-contained true
+./scripts/publish-win-x64.sh
 ```
 
-Замените `win-x64` на нужный RID, например `linux-x64`, `linux-arm64` или `osx-arm64`.
+После успешной сборки запускайте:
+
+```text
+artifacts/win-x64/cli/armorav.exe --help
+artifacts/win-x64/desktop/ArmorAV.Desktop.exe
+```
+
+Для другого RID используйте `dotnet publish`, например `linux-x64`, `linux-arm64` или `osx-arm64`:
+
+```bash
+dotnet publish src/ArmorAV.Cli/ArmorAV.Cli.csproj -c Release -r linux-x64 --self-contained true
+dotnet publish src/ArmorAV.Desktop/ArmorAV.Desktop.csproj -c Release -r linux-x64 --self-contained true
+```

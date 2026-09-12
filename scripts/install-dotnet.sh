@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# Installs the .NET 8 SDK for the current user; no root access is required.
 set -eu
 
 DOTNET_DIR="${DOTNET_ROOT:-$HOME/.dotnet}"
