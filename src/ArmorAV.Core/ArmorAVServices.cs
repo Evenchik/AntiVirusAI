@@ -1,9 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace ArmorAV
 {
-
     public static class ArmorAVPaths
     {
         public static string DataDirectory
@@ -11,11 +11,8 @@ namespace ArmorAV
             get
             {
                 var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                if (string.IsNullOrWhiteSpace(root))
-                    root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                if (string.IsNullOrWhiteSpace(root))
-                    root = AppContext.BaseDirectory;
-
+                if (string.IsNullOrWhiteSpace(root)) root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                if (string.IsNullOrWhiteSpace(root)) root = AppContext.BaseDirectory;
                 var directory = Path.Combine(root, Product.Name);
                 Directory.CreateDirectory(directory);
                 return directory;
@@ -40,16 +37,11 @@ namespace ArmorAV
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
             if (string.IsNullOrWhiteSpace(request.Path)) throw new ArgumentException("A file or directory path is required.", nameof(request));
-            if (!File.Exists(request.Path) && !Directory.Exists(request.Path))
-                throw new FileNotFoundException("The scan path does not exist.", request.Path);
+            if (!File.Exists(request.Path) && !Directory.Exists(request.Path)) throw new FileNotFoundException("The scan path does not exist.", request.Path);
             if (request.MaxDepth < 0) throw new ArgumentOutOfRangeException(nameof(request.MaxDepth));
             if (request.Threads < 1) throw new ArgumentOutOfRangeException(nameof(request.Threads));
 
-            var dataDirectory = string.IsNullOrWhiteSpace(request.DataDirectory)
-                ? ArmorAVPaths.DataDirectory
-                : Path.GetFullPath(request.DataDirectory);
-            Directory.CreateDirectory(dataDirectory);
-
+            var dataDirectory = ResolveDataDirectory(request.DataDirectory);
             var options = new Options
             {
                 Path = request.Path,
@@ -59,17 +51,12 @@ namespace ArmorAV
                 Threads = request.Threads,
                 AllowlistPath = request.AllowlistPath
             };
-            var report = new ScanReport
-            {
-                RootPath = Path.GetFullPath(request.Path),
-                StartedUtc = Util.Iso8601Utc(DateTime.UtcNow)
-            };
+            var report = new ScanReport { RootPath = Path.GetFullPath(request.Path), StartedUtc = Util.Iso8601Utc(DateTime.UtcNow) };
             var store = new QuarantineStore(dataDirectory, options.AllowlistPath);
             var cache = new ScanCache(dataDirectory, options.UseCache);
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             new ScanEngine(options, report, store, cache).Run(options.Path);
             stopwatch.Stop();
-
             report.DurationSeconds = stopwatch.Elapsed.TotalSeconds;
             report.CacheHits = cache.Hits;
             report.Consolidate();
@@ -77,9 +64,21 @@ namespace ArmorAV
             return report;
         }
 
+        public static List<QuarantineRecord> ListQuarantine(string? dataDirectory = null) => new QuarantineStore(ResolveDataDirectory(dataDirectory), null).List();
+
+        public static bool RestoreQuarantine(string id, out string message, string? dataDirectory = null) =>
+            new QuarantineStore(ResolveDataDirectory(dataDirectory), null).Restore(id, out message);
+
         public static void ExportJson(ScanReport report, string path) => File.WriteAllText(path, Reporter.Json(report));
         public static void ExportHtml(ScanReport report, string path) => File.WriteAllText(path, Reporter.Html(report));
         public static void ExportCsv(ScanReport report, string path) => File.WriteAllText(path, Reporter.Csv(report));
         public static void ExportSarif(ScanReport report, string path) => File.WriteAllText(path, Reporter.Sarif(report));
+
+        private static string ResolveDataDirectory(string? dataDirectory)
+        {
+            var directory = string.IsNullOrWhiteSpace(dataDirectory) ? ArmorAVPaths.DataDirectory : Path.GetFullPath(dataDirectory);
+            Directory.CreateDirectory(directory);
+            return directory;
+        }
     }
 }
