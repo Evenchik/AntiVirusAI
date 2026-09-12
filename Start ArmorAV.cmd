@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-set "APP=%~dp0artifacts\win-x64\desktop\ArmorAV.Desktop.exe"
+set "APP=%~dp0artifacts\win-x64\web\ArmorAV.Web.exe"
 if exist "%APP%" (
   start "" "%APP%"
   exit /b 0
@@ -14,7 +14,7 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Preparing ArmorAV. The first launch can take a few minutes.
-dotnet publish ".\src\ArmorAV.Desktop\ArmorAV.Desktop.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ".\artifacts\win-x64\desktop"
+dotnet publish ".\src\ArmorAV.Web\ArmorAV.Web.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ".\artifacts\win-x64\web"
 if errorlevel 1 (
   echo.
   echo ArmorAV could not be built. Keep this window open and send the error text to support.

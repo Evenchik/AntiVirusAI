@@ -15,7 +15,7 @@ namespace ArmorAV
     public static class Product
     {
         public const string Name = "ArmorAV";
-        public const string Version = "4.0.0";
+        public const string Version = "4.2.0";
         public const string Engine = "ArmorAV Static Engine";
         public const string Banner = "ArmorAV static malware scanner";
     }
@@ -387,6 +387,33 @@ namespace ArmorAV
                 new PatternSignature("Container.IsoAutorun", "[autorun]", 35, "container-abuse", Severity.Medium),
                 new PatternSignature("Container.LnkPowershellTarget", "\\v1.0\\powershell.exe", 55, "container-abuse", Severity.High),
                 new PatternSignature("Container.OneNoteEmbedded", "onenote.file.embedded", 60, "container-abuse", Severity.High),
+
+                new PatternSignature("Loader.CertutilUrlCache", "certutil -urlcache -split -f", 70, "loader", Severity.High),
+                new PatternSignature("Loader.CertutilDecode", "certutil -decode", 45, "loader", Severity.Medium),
+                new PatternSignature("Loader.BitsadminTransfer", "bitsadmin /transfer", 60, "loader", Severity.High),
+                new PatternSignature("Loader.BitsadminAddFile", "bitsadmin /addfile", 45, "loader", Severity.Medium),
+                new PatternSignature("Loader.MshtaRemote", "mshta http", 70, "loader", Severity.High),
+                new PatternSignature("Loader.Regsvr32RemoteScriptlet", "regsvr32 /s /n /u /i:http", 80, "lolbin", Severity.Critical),
+                new PatternSignature("Loader.Rundll32Javascript", "rundll32 javascript:", 75, "lolbin", Severity.High),
+                new PatternSignature("Loader.InstallUtilPayload", "installutil.exe /logfile= /logtoconsole=false", 70, "lolbin", Severity.High),
+                new PatternSignature("Loader.InlinePowerShell", "powershell -nop -w hidden", 55, "loader", Severity.High),
+                new PatternSignature("Loader.InvokeWebRequest", "invoke-webrequest", 25, "loader", Severity.Low),
+                new PatternSignature("Persist.RunOnceEx", "\\currentversion\\runonceex", 50, "persistence", Severity.High),
+                new PatternSignature("Persist.WinlogonShell", "\\windows nt\\currentversion\\winlogon", 45, "persistence", Severity.Medium),
+                new PatternSignature("Persist.BootExecute", "\\session manager\\bootexecute", 60, "persistence", Severity.High),
+                new PatternSignature("Persist.SchtasksOnLogon", "schtasks /create /sc onlogon", 60, "persistence", Severity.High),
+                new PatternSignature("Persist.SchtasksMinute", "schtasks /create /sc minute", 55, "persistence", Severity.High),
+                new PatternSignature("CredTheft.Dcsync", "lsadump::dcsync", 85, "credential-access", Severity.Critical),
+                new PatternSignature("CredTheft.SekurlsaEkeys", "sekurlsa::ekeys", 75, "credential-access", Severity.High),
+                new PatternSignature("CredTheft.LsassProcdump64", "procdump64.exe -ma lsass", 85, "credential-access", Severity.Critical),
+                new PatternSignature("Exfil.DiscordWebhook", "discord.com/api/webhooks", 55, "exfiltration", Severity.High),
+                new PatternSignature("Exfil.TelegramBotApi", "api.telegram.org/bot", 45, "exfiltration", Severity.Medium),
+                new PatternSignature("Exfil.RcloneCopy", "rclone copy", 45, "exfiltration", Severity.Medium),
+                new PatternSignature("Lateral.PsExec", "psexec.exe", 45, "lateral-movement", Severity.Medium),
+                new PatternSignature("Lateral.WmicRemoteProcess", "wmic /node:", 45, "lateral-movement", Severity.Medium),
+                new PatternSignature("Defense.NetshFirewallDelete", "netsh advfirewall firewall delete rule", 50, "defense-evasion", Severity.High),
+                new PatternSignature("Defense.ClearPowerShellHistory", "clear-history", 30, "antiforensics", Severity.Low),
+                new PatternSignature("Defense.DeletePrefetch", "del /f /q %systemroot%\\prefetch", 45, "antiforensics", Severity.Medium),
             };
         }
 
@@ -502,6 +529,8 @@ namespace ArmorAV
             { "Name.ExcessiveWhitespacePadding", (55, "masquerading", Severity.High) },
             { "Name.HomoglyphCharacters", (50, "masquerading", Severity.High) },
             { "Name.RandomLookingName", (20, "masquerading", Severity.Low) },
+            { "Name.LureExecutable", (20, "social-engineering", Severity.Low) },
+            { "Name.UserWritableExecutable", (20, "execution", Severity.Low) },
 
             { "Rep.KnownPackerImpHash", (25, "reputation", Severity.Low) },
             { "Rep.RepeatedImpHashInScan", (30, "reputation", Severity.Medium) },
@@ -511,6 +540,9 @@ namespace ArmorAV
             { "Script.VeryLongIdentifiers", (25, "obfuscation", Severity.Low) },
             { "Script.HighEntropyText", (35, "obfuscation", Severity.Medium) },
             { "Script.SuspiciousSelfDelete", (45, "antiforensics", Severity.Medium) },
+            { "Script.DownloadExecutionChain", (70, "loader", Severity.High) },
+            { "Script.EncodedExecutionChain", (75, "loader", Severity.High) },
+            { "Script.NativeInteropInjection", (65, "injection", Severity.High) },
 
             { "PE.RichHeaderMissing", (20, "packing", Severity.Low) },
             { "PE.RichHeaderChecksumMismatch", (45, "trust", Severity.Medium) },
@@ -983,6 +1015,16 @@ namespace ArmorAV
                 }
             }
 
+            if (FileTyper.IsExecutableExtension(lowerName))
+            {
+                string[] lureWords = { "invoice", "payment", "document", "receipt", "salary", "scan", "update", "договор", "счет", "оплата", "документ" };
+                if (lureWords.Any(word => lowerName.Contains(word, StringComparison.Ordinal)))
+                    hits.Add(new DeobHit("Name.LureExecutable", "executable name uses a common document or payment lure"));
+                if (lowerPath.Contains("\\\\appdata\\\\local\\\\temp\\\\", StringComparison.Ordinal) ||
+                    lowerPath.Contains("\\\\downloads\\\\", StringComparison.Ordinal))
+                    hits.Add(new DeobHit("Name.UserWritableExecutable", "executable originates from a user-writable temporary or download location"));
+            }
+
             var stem = Path.GetFileNameWithoutExtension(lowerName);
             if (stem.Length >= 12 && stem.All(c => char.IsLetterOrDigit(c)))
             {
@@ -1000,7 +1042,6 @@ namespace ArmorAV
         public static List<DeobHit> Analyze(string text, string lowerText)
         {
             var hits = new List<DeobHit>();
-            if (text.Length < 256) return hits;
 
             int longestLine = 0, current = 0;
             foreach (char c in text)
@@ -1031,6 +1072,32 @@ namespace ArmorAV
                  lowerText.Contains("remove-item $myinvocation", StringComparison.Ordinal) ||
                  lowerText.Contains("deletefile(wscript.scriptfullname", StringComparison.Ordinal)))
                 hits.Add(new DeobHit("Script.SuspiciousSelfDelete", "script deletes itself after execution"));
+
+            bool download = lowerText.Contains("downloadstring", StringComparison.Ordinal) ||
+                            lowerText.Contains("downloadfile", StringComparison.Ordinal) ||
+                            lowerText.Contains("invoke-webrequest", StringComparison.Ordinal) ||
+                            lowerText.Contains("start-bitstransfer", StringComparison.Ordinal);
+            bool execute = lowerText.Contains("invoke-expression", StringComparison.Ordinal) ||
+                           lowerText.Contains("iex(", StringComparison.Ordinal) ||
+                           lowerText.Contains("iex ", StringComparison.Ordinal) ||
+                           lowerText.Contains("start-process", StringComparison.Ordinal) ||
+                           lowerText.Contains("wscript.shell", StringComparison.Ordinal);
+            if (download && execute)
+                hits.Add(new DeobHit("Script.DownloadExecutionChain", "download primitive combined with an execution primitive"));
+
+            bool decode = lowerText.Contains("frombase64string", StringComparison.Ordinal) ||
+                          lowerText.Contains("-encodedcommand", StringComparison.Ordinal) ||
+                          lowerText.Contains("-enc ", StringComparison.Ordinal);
+            if (decode && execute)
+                hits.Add(new DeobHit("Script.EncodedExecutionChain", "encoded content is decoded and executed in the same script"));
+
+            bool allocation = lowerText.Contains("virtualalloc", StringComparison.Ordinal) ||
+                              lowerText.Contains("virtualprotect", StringComparison.Ordinal);
+            bool interop = lowerText.Contains("add-type", StringComparison.Ordinal) ||
+                           lowerText.Contains("dllimport", StringComparison.Ordinal) ||
+                           lowerText.Contains("marshal]::copy", StringComparison.Ordinal);
+            if (allocation && interop)
+                hits.Add(new DeobHit("Script.NativeInteropInjection", "native memory allocation combined with managed interop"));
 
             return hits;
         }
@@ -1429,6 +1496,8 @@ namespace ArmorAV
             { "social-engineering", new[] { "T1566.001" } },
             { "exploit", new[] { "T1203" } },
             { "mail", new[] { "T1566.001" } },
+            { "lateral-movement", new[] { "T1021", "T1047" } },
+            { "execution", new[] { "T1059" } },
         };
 
         public static string[] For(string family)

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>ArmorAV.Web</AssemblyName>
+    <RootNamespace>ArmorAV.Web</RootNamespace>
+    <Description>ArmorAV local browser interface.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ArmorAV.Core/ArmorAV.Core.csproj" />
+  </ItemGroup>
+</Project>

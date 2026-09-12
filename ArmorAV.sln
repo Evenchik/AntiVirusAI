@@ -6,7 +6,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArmorAV.Core", "src\ArmorAV
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArmorAV.Cli", "src\ArmorAV.Cli\ArmorAV.Cli.csproj", "{AB558F8D-AF5C-4942-B09E-C603B236EB2B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArmorAV.Desktop", "src\ArmorAV.Desktop\ArmorAV.Desktop.csproj", "{C094A4D4-1D8B-4C91-BC35-07F2952E43F2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArmorAV.Web", "src\ArmorAV.Web\ArmorAV.Web.csproj", "{C094A4D4-1D8B-4C91-BC35-07F2952E43F2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArmorAV.SmokeTests", "tests\ArmorAV.SmokeTests\ArmorAV.SmokeTests.csproj", "{C3BEB38F-A9A2-47A0-A97D-CC4A3D8B167A}"
 EndProject

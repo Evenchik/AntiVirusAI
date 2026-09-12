@@ -10,4 +10,4 @@ else
   exit 1
 fi
 
-exec "$DOTNET" run --project src/ArmorAV.Desktop/ArmorAV.Desktop.csproj
+exec "$DOTNET" run --project src/ArmorAV.Web/ArmorAV.Web.csproj -- "$@"
