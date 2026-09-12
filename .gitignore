@@ -1,0 +1,26 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+out/
+artifacts/
+
+# .NET user settings and local SDK installation
+.vs/
+.dotnet/
+*.user
+*.suo
+
+# ArmorAV runtime state — never commit quarantine data, cache or reports
+armorav-data/
+quarantine/
+armorav-cache.tsv
+*.sarif
+scan-report.json
+scan-report.html
+scan-report.csv
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>ArmorAV.Core</AssemblyName>
+    <RootNamespace>ArmorAV</RootNamespace>
+    <Description>Static malware scanning engine shared by ArmorAV interfaces.</Description>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,84 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ArmorAV.Desktop.MainWindow"
+        Title="ArmorAV — Static Malware Scanner"
+        Width="1180" Height="780"
+        MinWidth="840" MinHeight="580"
+        Background="#101722">
+  <Window.Styles>
+    <Style Selector="Button">
+      <Setter Property="Margin" Value="0,0,8,0" />
+      <Setter Property="Padding" Value="14,9" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Padding" Value="10,8" />
+    </Style>
+  </Window.Styles>
+
+  <Grid Margin="28" RowDefinitions="Auto,Auto,*,Auto">
+    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,22">
+      <StackPanel Spacing="4">
+        <TextBlock Text="ARMORAV" FontSize="27" FontWeight="Bold" Foreground="#7DD3FC" />
+        <TextBlock Text="Локальный статический анализатор угроз" Foreground="#A8B3C7" FontSize="14" />
+      </StackPanel>
+      <Border Grid.Column="1" Background="#16364A" CornerRadius="16" Padding="12,6" VerticalAlignment="Center">
+        <TextBlock Text="Никакие файлы не отправляются в сеть" Foreground="#B8E8FF" FontSize="12" />
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="1" Background="#172231" BorderBrush="#26384E" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,18">
+      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
+        <TextBox Name="TargetPathBox" Watermark="Выберите файл или папку для сканирования" VerticalContentAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+          <Button Click="BrowseFile_Click">Файл</Button>
+          <Button Click="BrowseFolder_Click">Папка</Button>
+          <Button Name="ScanButton" Click="Scan_Click" Background="#0E7490" Foreground="White" Margin="0">Сканировать</Button>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,14,0,0" Spacing="16">
+          <CheckBox Name="QuarantineCheckBox" Content="Карантинировать только подтверждённые угрозы" />
+          <CheckBox Name="CacheCheckBox" Content="Использовать локальный кэш" IsChecked="True" />
+          <TextBlock Name="StatusText" Foreground="#A8B3C7" VerticalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="14">
+      <Border Background="#172231" BorderBrush="#26384E" BorderThickness="1" CornerRadius="10" Padding="18">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="5">
+            <TextBlock Name="SummaryText" Text="Готов к сканированию" FontSize="18" FontWeight="SemiBold" />
+            <TextBlock Name="MetricsText" Text="Выберите файл или папку. ArmorAV анализирует локально и использует общие правила с CLI." Foreground="#A8B3C7" TextWrapping="Wrap" />
+          </StackPanel>
+          <ProgressBar Name="ScanProgress" Grid.Column="1" Width="190" Height="8" IsIndeterminate="False" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1" Background="#172231" BorderBrush="#26384E" BorderThickness="1" CornerRadius="10" Padding="8">
+        <Grid RowDefinitions="Auto,*">
+          <Grid Margin="10,8,10,10" ColumnDefinitions="*,Auto">
+            <TextBlock Text="Результаты" FontSize="16" FontWeight="SemiBold" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+              <Button Name="ExportJsonButton" Click="ExportJson_Click" IsEnabled="False">Экспорт JSON</Button>
+              <Button Name="ExportHtmlButton" Click="ExportHtml_Click" IsEnabled="False" Margin="0">Экспорт HTML</Button>
+            </StackPanel>
+          </Grid>
+          <ListBox Name="ResultsList" Grid.Row="1" BorderThickness="0" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Background="#1D2A3A" CornerRadius="7" Margin="4" Padding="12">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Details}" Foreground="#B7C4D8" FontSize="12" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <TextBlock Grid.Row="3" Margin="2,18,2,0" Foreground="#718096" FontSize="12"
+               Text="Карантин ArmorAV использует локальное аутентифицированное шифрование. Перед удалением исходного файла его хэш проверяется повторно." />
+  </Grid>
+</Window>

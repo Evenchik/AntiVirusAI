@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>armorav</AssemblyName>
+    <RootNamespace>ArmorAV.Cli</RootNamespace>
+    <Description>ArmorAV command-line scanner.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ArmorAV.Core/ArmorAV.Core.csproj" />
+  </ItemGroup>
+</Project>
