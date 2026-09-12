@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text.Json.Nodes;
 using ArmorAV;
 
 namespace ArmorAV.SmokeTests;
@@ -13,8 +14,12 @@ internal static class Program
         {
             DetectsKnownAndBenignSamples(root);
             DetectsExecutionChains(root);
+            DetectsUserWritableExecutableNames();
             DetectsZipTraversal(root);
+            CacheRequiresAnExactContentHash(root);
+            CsvFormulaValuesAreNeutralized();
             QuarantineIsAuthenticatedAndRestorable(root);
+            QuarantineMetadataTamperingIsRejected(root);
             Console.WriteLine("ArmorAV smoke tests passed.");
             return 0;
         }
@@ -66,6 +71,12 @@ internal static class Program
             "a download-and-execute chain must be detected");
     }
 
+    private static void DetectsUserWritableExecutableNames()
+    {
+        var hits = NameAnalyzer.Analyze(@"C:\Users\Test\Downloads\invoice_update.exe");
+        Assert(hits.Any(x => x.Key == "Name.UserWritableExecutable"), "a lure executable in Downloads must be identified as user-writable");
+    }
+
     private static void DetectsZipTraversal(string root)
     {
         var path = Path.Combine(root, "traversal.zip");
@@ -86,6 +97,31 @@ internal static class Program
             "a path traversal ZIP entry must be reported");
     }
 
+    private static void CacheRequiresAnExactContentHash(string root)
+    {
+        var dataDirectory = Path.Combine(root, "cache-data");
+        var path = Path.Combine(root, "cache-test.ps1");
+        var benign = "Write-Output 'safe';".PadRight(80);
+        var suspicious = "vssadmin delete shadows /all /quiet;".PadRight(80);
+        Assert(benign.Length == suspicious.Length, "cache fixture lengths must match");
+        File.WriteAllText(path, benign);
+        var originalTimestamp = File.GetLastWriteTimeUtc(path);
+        var first = ArmorAVService.Scan(new ScanRequest { Path = path, DataDirectory = dataDirectory, UseCache = true });
+        Assert(first.CacheHits == 0 && first.Results.Single().VerdictText == Verdict.Clean.ToString(), "the initial cache fixture must be clean and uncached");
+
+        File.WriteAllText(path, suspicious);
+        File.SetLastWriteTimeUtc(path, originalTimestamp);
+        var second = ArmorAVService.Scan(new ScanRequest { Path = path, DataDirectory = dataDirectory, UseCache = true });
+        Assert(second.CacheHits == 0, "a same-size file with a preserved timestamp must not hit cache");
+        Assert(second.Results.Single().Findings.Any(x => x.Name == "Ransom.VssadminDeleteShadows"), "changed cached content must be analyzed again");
+    }
+
+    private static void CsvFormulaValuesAreNeutralized()
+    {
+        Assert(Util.CsvEscape("=HYPERLINK(\"https://example.invalid\")").StartsWith("'", StringComparison.Ordinal),
+            "CSV values beginning with a spreadsheet formula marker must be neutralized");
+    }
+
     private static void QuarantineIsAuthenticatedAndRestorable(string root)
     {
         var dataDirectory = Path.Combine(root, "quarantine-data");
@@ -103,6 +139,24 @@ internal static class Program
 
         Assert(store.Restore(record.Id, out var message), "the new quarantine format must restore: " + message);
         Assert(File.ReadAllBytes(source).AsSpan().SequenceEqual(bytes), "restored bytes must match the original file");
+    }
+
+    private static void QuarantineMetadataTamperingIsRejected(string root)
+    {
+        var dataDirectory = Path.Combine(root, "tamper-data");
+        var source = Path.Combine(root, "tamper-source.bin");
+        var alternate = Path.Combine(root, "tamper-target.bin");
+        File.WriteAllText(source, "authenticated quarantine sample");
+        var store = new QuarantineStore(dataDirectory, null);
+        var record = store.Store(source, Hasher.FromFile(source), "fingerprint", 100, new[] { "test" }, dryRun: false);
+        var metadataPath = Path.Combine(dataDirectory, "quarantine", record.Id + ".json");
+        var metadata = JsonNode.Parse(File.ReadAllText(metadataPath))!.AsObject();
+        metadata["originalPath"] = alternate;
+        File.WriteAllText(metadataPath, metadata.ToJsonString());
+
+        Assert(!store.Restore(record.Id, out _), "changing authenticated quarantine metadata must block restore");
+        Assert(!File.Exists(alternate), "tampered metadata must not choose a restore destination");
+        Assert(!store.Restore("../" + record.Id, out _), "path-like quarantine identifiers must be rejected");
     }
 
     private static void CopyFixture(string fileName, string destination)

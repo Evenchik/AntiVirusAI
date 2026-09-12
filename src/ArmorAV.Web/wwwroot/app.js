@@ -1,8 +1,15 @@
-const state = { jobId: null, report: null, currentBrowsePath: null, browseParent: null, pollTimer: null };
+const state = { jobId: null, report: null, currentBrowsePath: null, browseParent: null, pollTimer: null, token: null, locations: {} };
 const el = (id) => document.getElementById(id);
 const text = (id, value) => { el(id).textContent = value; };
 const formatBytes = (value) => value < 1024 ? `${value} Б` : value < 1024 * 1024 ? `${(value / 1024).toFixed(1)} КБ` : `${(value / 1024 / 1024).toFixed(1)} МБ`;
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+
+async function api(path, options = {}) {
+  if (!state.token) throw new Error('Локальная сессия ещё не готова.');
+  const headers = new Headers(options.headers || {});
+  headers.set('X-ArmorAV-Token', state.token);
+  return fetch(path, { ...options, headers });
+}
 
 function showView(name) {
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === `${name}-view`));
@@ -53,7 +60,7 @@ async function startScan() {
   const path = el('target-path').value.trim();
   if (!path) { toast('Сначала выберите файл или папку.'); return; }
   const command = { path, quarantineConfirmed: el('quarantine-enabled').checked, useCache: el('cache-enabled').checked, maxDepth: Number(el('max-depth').value), threads: Number(el('thread-count').value) };
-  const response = await fetch('/api/scans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
+  const response = await api('/api/scans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
   const data = await response.json();
   if (!response.ok) { toast(data.message || 'Не удалось начать проверку.'); return; }
   state.jobId = data.id;
@@ -66,7 +73,7 @@ async function startScan() {
 async function pollScan() {
   if (!state.jobId) return;
   try {
-    const response = await fetch(`/api/scans/${state.jobId}`);
+    const response = await api(`/api/scans/${state.jobId}`);
     const data = await response.json();
     text('scan-status', data.message);
     if (data.state === 'completed') {
@@ -82,7 +89,7 @@ async function pollScan() {
 }
 
 async function openBrowser(path) {
-  const response = await fetch(`/api/browse${path ? `?path=${encodeURIComponent(path)}` : ''}`);
+  const response = await api(`/api/browse${path ? `?path=${encodeURIComponent(path)}` : ''}`);
   const data = await response.json();
   if (!response.ok) { toast(data.message || 'Не удалось открыть папку.'); return; }
   state.currentBrowsePath = data.path; state.browseParent = data.parentPath;
@@ -98,7 +105,7 @@ function selectPath(path) { el('target-path').value = path; el('browser-dialog')
 async function loadQuarantine() {
   const list = el('quarantine-list'); text('quarantine-caption', 'Загрузка списка…'); list.innerHTML = '';
   try {
-    const response = await fetch('/api/quarantine'); const records = await response.json();
+    const response = await api('/api/quarantine'); const records = await response.json();
     text('quarantine-caption', records.length ? `Объектов в карантине: ${records.length}` : 'Карантин пуст.');
     list.innerHTML = records.length ? records.map((record) => `<div class="quarantine-row"><div><h4>${escapeHtml(record.originalPath)}</h4><p>${escapeHtml(record.timestampUtc)} · SHA-256: ${escapeHtml(record.sha256)}</p></div><button class="restore-button" data-restore="${record.id}">Восстановить</button></div>`).join('') : '<div class="empty-state compact"><div>▣</div><p>В карантине пока нет объектов.</p></div>';
     list.querySelectorAll('[data-restore]').forEach((button) => button.addEventListener('click', () => restoreItem(button.dataset.restore)));
@@ -106,25 +113,42 @@ async function loadQuarantine() {
 }
 
 async function restoreItem(id) {
-  const response = await fetch(`/api/quarantine/${encodeURIComponent(id)}/restore`, { method: 'POST' }); const data = await response.json(); toast(data.message); if (response.ok) loadQuarantine();
+  const response = await api(`/api/quarantine/${encodeURIComponent(id)}/restore`, { method: 'POST' }); const data = await response.json(); toast(data.message); if (response.ok) loadQuarantine();
 }
 
-function downloadReport(format) { if (!state.jobId) { toast('Сначала завершите проверку.'); return; } window.location.href = `/api/scans/${state.jobId}/report?format=${format}`; }
+async function downloadReport(format) {
+  if (!state.jobId) { toast('Сначала завершите проверку.'); return; }
+  try {
+    const response = await api(`/api/scans/${state.jobId}/report?format=${encodeURIComponent(format)}`);
+    if (!response.ok) { const data = await response.json(); toast(data.message || 'Не удалось скачать отчёт.'); return; }
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `ArmorAV-report.${format}`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch { toast('Не удалось скачать отчёт.'); }
+}
 function toast(message) { const box = el('toast'); box.textContent = message; box.classList.remove('hidden'); clearTimeout(box.timer); box.timer = setTimeout(() => box.classList.add('hidden'), 4200); }
 
-let locations = {};
-
 async function quickPath(kind) {
-  if (!Object.keys(locations).length) {
-    const response = await fetch('/api/locations');
-    locations = await response.json();
-  }
-  openBrowser(locations[kind] || locations.home);
+  openBrowser(state.locations[kind] || state.locations.home);
 }
 
 document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));
 document.querySelectorAll('[data-open-view]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.openView)));
 el('header-scan').addEventListener('click', () => showView('scan')); el('hero-scan').addEventListener('click', () => showView('scan')); el('start-scan').addEventListener('click', startScan); el('browse-button').addEventListener('click', () => openBrowser(el('target-path').value.trim()));
 el('close-browser').addEventListener('click', () => el('browser-dialog').close()); el('parent-folder').addEventListener('click', () => { if (state.browseParent) openBrowser(state.browseParent); }); el('open-path').addEventListener('click', () => openBrowser(el('browser-path').value.trim())); el('browser-path').addEventListener('keydown', (event) => { if (event.key === 'Enter') openBrowser(event.target.value.trim()); });
-el('refresh-quarantine').addEventListener('click', loadQuarantine); document.querySelectorAll('[data-report]').forEach((button) => button.addEventListener('click', () => downloadReport(button.dataset.report))); document.querySelectorAll('[data-quick]').forEach((button) => button.addEventListener('click', () => quickPath(button.dataset.quick))); el('stop-app').addEventListener('click', async () => { await fetch('/api/shutdown', { method: 'POST' }); text('live-status', 'ArmorAV завершён'); toast('ArmorAV завершён. Эту вкладку можно закрыть.'); });
-fetch('/api/health').then((response) => response.json()).then((data) => { text('live-status', `Готов · ${data.version}`); }).catch(() => text('live-status', 'Локальный режим'));
+el('refresh-quarantine').addEventListener('click', loadQuarantine); document.querySelectorAll('[data-report]').forEach((button) => button.addEventListener('click', () => downloadReport(button.dataset.report))); document.querySelectorAll('[data-quick]').forEach((button) => button.addEventListener('click', () => quickPath(button.dataset.quick))); el('stop-app').addEventListener('click', async () => {
+  try {
+    const response = await api('/api/shutdown', { method: 'POST' });
+    if (!response.ok) throw new Error();
+    text('live-status', 'ArmorAV завершён');
+    toast('ArmorAV завершён. Эту вкладку можно закрыть.');
+  } catch { toast('Не удалось завершить ArmorAV.'); }
+});
+fetch('/api/config').then((response) => response.json()).then((data) => {
+  state.token = data.token;
+  state.locations = data.locations || {};
+  text('live-status', `Готов · ${data.version}`);
+}).catch(() => text('live-status', 'Не удалось подключиться к локальному сервису'));

@@ -38,8 +38,8 @@ namespace ArmorAV
             if (request == null) throw new ArgumentNullException(nameof(request));
             if (string.IsNullOrWhiteSpace(request.Path)) throw new ArgumentException("A file or directory path is required.", nameof(request));
             if (!File.Exists(request.Path) && !Directory.Exists(request.Path)) throw new FileNotFoundException("The scan path does not exist.", request.Path);
-            if (request.MaxDepth < 0) throw new ArgumentOutOfRangeException(nameof(request.MaxDepth));
-            if (request.Threads < 1) throw new ArgumentOutOfRangeException(nameof(request.Threads));
+            if (request.MaxDepth is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(request.MaxDepth));
+            if (request.Threads is < 1 or > 64) throw new ArgumentOutOfRangeException(nameof(request.Threads));
 
             var dataDirectory = ResolveDataDirectory(request.DataDirectory);
             var options = new Options

@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace ArmorAV
@@ -15,7 +16,7 @@ namespace ArmorAV
     public static class Product
     {
         public const string Name = "ArmorAV";
-        public const string Version = "4.2.0";
+        public const string Version = "4.2.1";
         public const string Engine = "ArmorAV Static Engine";
         public const string Banner = "ArmorAV static malware scanner";
     }
@@ -472,6 +473,7 @@ namespace ArmorAV
             { "Archive.PathTraversal", (80, "archive-abuse", Severity.Critical) },
             { "Archive.UnsupportedCompressedExecutable", (45, "archive-abuse", Severity.Medium) },
             { "Archive.NestedDepthExceeded", (25, "archive-abuse", Severity.Low) },
+            { "Archive.EntryAnalysisTruncated", (10, "archive-abuse", Severity.Info) },
             { "Archive.EncryptedEntryWithExecutable", (55, "archive-abuse", Severity.High) },
             { "Archive.DoubleExtensionEntry", (60, "masquerading", Severity.High) },
             { "Archive.LnkDropper", (55, "dropper", Severity.High) },
@@ -936,7 +938,7 @@ namespace ArmorAV
         public static bool LooksLikeIso(byte[] head, long fileLength)
         {
             if (fileLength < 0x8006) return false;
-            return head.Length > 0x8006 &&
+            return head.Length >= 0x8006 &&
                    head[0x8001] == 0x43 && head[0x8002] == 0x44 && head[0x8003] == 0x30 &&
                    head[0x8004] == 0x30 && head[0x8005] == 0x31;
         }
@@ -1020,8 +1022,8 @@ namespace ArmorAV
                 string[] lureWords = { "invoice", "payment", "document", "receipt", "salary", "scan", "update", "договор", "счет", "оплата", "документ" };
                 if (lureWords.Any(word => lowerName.Contains(word, StringComparison.Ordinal)))
                     hits.Add(new DeobHit("Name.LureExecutable", "executable name uses a common document or payment lure"));
-                if (lowerPath.Contains("\\\\appdata\\\\local\\\\temp\\\\", StringComparison.Ordinal) ||
-                    lowerPath.Contains("\\\\downloads\\\\", StringComparison.Ordinal))
+                if (lowerPath.Contains("\\appdata\\local\\temp\\", StringComparison.Ordinal) ||
+                    lowerPath.Contains("\\downloads\\", StringComparison.Ordinal))
                     hits.Add(new DeobHit("Name.UserWritableExecutable", "executable originates from a user-writable temporary or download location"));
             }
 
@@ -1806,7 +1808,7 @@ namespace ArmorAV
                     sb.Clear();
                     continue;
                 }
-                if (b >= 32 && b < 127) sb.Append((char)b);
+                if (b >= 32 && b < 127 && sb.Length < 8192) sb.Append((char)b);
             }
         }
 
@@ -1887,6 +1889,8 @@ namespace ArmorAV
         private int _miniSectorSize = 64;
         private uint _miniCutoff = 4096;
         private uint _rootStart;
+        private const int MaximumEntries = 8192;
+        private const long MaximumReadBytes = 8L * 1024 * 1024;
         public bool Parsed;
 
         private static ushort U16(byte[] b, int o) => (ushort)(b[o] | (b[o + 1] << 8));
@@ -1900,19 +1904,23 @@ namespace ArmorAV
                 if (data.Length < 512) return null;
                 if (!(data[0] == 0xD0 && data[1] == 0xCF && data[2] == 0x11 && data[3] == 0xE0)) return null;
                 f._data = data;
-                f._sectorSize = 1 << U16(data, 0x1E);
-                f._miniSectorSize = 1 << U16(data, 0x20);
-                if (f._sectorSize < 128 || f._sectorSize > 65536) return null;
+                ushort sectorShift = U16(data, 0x1E);
+                ushort miniSectorShift = U16(data, 0x20);
+                if ((sectorShift != 9 && sectorShift != 12) || miniSectorShift != 6) return null;
+                f._sectorSize = 1 << sectorShift;
+                f._miniSectorSize = 1 << miniSectorShift;
                 uint numFat = U32(data, 0x2C);
                 uint firstDir = U32(data, 0x30);
                 f._miniCutoff = U32(data, 0x38);
+                if (f._miniCutoff != 4096) return null;
                 uint firstMiniFat = U32(data, 0x3C);
                 uint numMiniFat = U32(data, 0x40);
                 uint firstDifat = U32(data, 0x44);
                 uint numDifat = U32(data, 0x48);
 
                 var fatSectors = new List<uint>();
-                for (int i = 0; i < 109 && i < numFat; i++)
+                int maximumFatSectors = Math.Min(MaximumEntries, Math.Max(1, data.Length / f._sectorSize));
+                for (int i = 0; i < 109 && i < numFat && fatSectors.Count < maximumFatSectors; i++)
                 {
                     uint v = U32(data, 0x4C + i * 4);
                     if (v == 0xFFFFFFFFu) break;
@@ -1920,12 +1928,12 @@ namespace ArmorAV
                 }
                 uint difat = firstDifat;
                 int difatGuard = 0;
-                while (difat != 0xFFFFFFFEu && difat != 0xFFFFFFFFu && difatGuard++ < 64 && fatSectors.Count < numFat)
+                while (difat != 0xFFFFFFFEu && difat != 0xFFFFFFFFu && difatGuard++ < 64 && fatSectors.Count < numFat && fatSectors.Count < maximumFatSectors)
                 {
                     int off = f.SectorOffset(difat);
                     if (off < 0 || off + f._sectorSize > data.Length) break;
                     int perSector = f._sectorSize / 4 - 1;
-                    for (int i = 0; i < perSector; i++)
+                    for (int i = 0; i < perSector && fatSectors.Count < maximumFatSectors; i++)
                     {
                         uint v = U32(data, off + i * 4);
                         if (v == 0xFFFFFFFFu) continue;
@@ -1947,7 +1955,7 @@ namespace ArmorAV
                 var miniFat = new List<uint>();
                 uint mf = firstMiniFat;
                 int mfGuard = 0;
-                while (mf != 0xFFFFFFFEu && mf != 0xFFFFFFFFu && mfGuard++ < (int)Math.Max(numMiniFat, 1) + 64)
+                while (mf != 0xFFFFFFFEu && mf != 0xFFFFFFFFu && mfGuard++ < Math.Min((int)Math.Min(numMiniFat, (uint)MaximumEntries), MaximumEntries) + 64)
                 {
                     int off = f.SectorOffset(mf);
                     if (off < 0 || off + f._sectorSize > data.Length) break;
@@ -1978,7 +1986,7 @@ namespace ArmorAV
                             Size = U32(data, eo + 120)
                         };
                         if (entry.Type == 5) f._rootStart = entry.StartSector;
-                        if (entry.Type == 1 || entry.Type == 2 || entry.Type == 5) f.Entries.Add(entry);
+                        if ((entry.Type == 1 || entry.Type == 2 || entry.Type == 5) && f.Entries.Count < MaximumEntries) f.Entries.Add(entry);
                     }
                     dir = f.NextSector(dir);
                 }
@@ -2009,16 +2017,18 @@ namespace ArmorAV
         {
             try
             {
-                if (entry.Size <= 0 || entry.Size > 64 * 1024 * 1024) return Array.Empty<byte>();
-                if (entry.Size < _miniCutoff && entry.Type != 5) return ReadMini(entry);
-                var output = new List<byte>((int)entry.Size);
+                if (entry.Size <= 0) return Array.Empty<byte>();
+                long requested = Math.Min(entry.Size, Math.Min(_data.LongLength, MaximumReadBytes));
+                if (requested <= 0) return Array.Empty<byte>();
+                if (entry.Size < _miniCutoff && entry.Type != 5) return ReadMini(entry, requested);
+                var output = new List<byte>((int)requested);
                 uint sector = entry.StartSector;
                 int guard = 0;
-                while (sector != 0xFFFFFFFEu && sector != 0xFFFFFFFFu && output.Count < entry.Size && guard++ < 1 << 20)
+                while (sector != 0xFFFFFFFEu && sector != 0xFFFFFFFFu && output.Count < requested && guard++ < 1 << 20)
                 {
                     int off = SectorOffset(sector);
                     if (off < 0 || off + _sectorSize > _data.Length) break;
-                    for (int i = 0; i < _sectorSize && output.Count < entry.Size; i++) output.Add(_data[off + i]);
+                    for (int i = 0; i < _sectorSize && output.Count < requested; i++) output.Add(_data[off + i]);
                     sector = NextSector(sector);
                 }
                 return output.ToArray();
@@ -2029,19 +2039,19 @@ namespace ArmorAV
             }
         }
 
-        private byte[] ReadMini(OleEntry entry)
+        private byte[] ReadMini(OleEntry entry, long requested)
         {
             var root = Entries.FirstOrDefault(e => e.Type == 5);
             if (root == null) return Array.Empty<byte>();
-            var miniStream = ReadChain(_rootStart, root.Size);
-            var output = new List<byte>((int)entry.Size);
+            var miniStream = ReadChain(_rootStart, Math.Min(root.Size, MaximumReadBytes));
+            var output = new List<byte>((int)requested);
             uint sector = entry.StartSector;
             int guard = 0;
-            while (sector != 0xFFFFFFFEu && sector != 0xFFFFFFFFu && output.Count < entry.Size && guard++ < 1 << 20)
+            while (sector != 0xFFFFFFFEu && sector != 0xFFFFFFFFu && output.Count < requested && guard++ < 1 << 20)
             {
                 long off = (long)sector * _miniSectorSize;
                 if (off < 0 || off + _miniSectorSize > miniStream.Length) break;
-                for (int i = 0; i < _miniSectorSize && output.Count < entry.Size; i++) output.Add(miniStream[off + i]);
+                for (int i = 0; i < _miniSectorSize && output.Count < requested; i++) output.Add(miniStream[off + i]);
                 sector = sector < _miniFat.Length ? _miniFat[sector] : 0xFFFFFFFEu;
             }
             return output.ToArray();
@@ -2049,7 +2059,9 @@ namespace ArmorAV
 
         private byte[] ReadChain(uint start, long size)
         {
-            var output = new List<byte>();
+            size = Math.Min(size, Math.Min(_data.LongLength, MaximumReadBytes));
+            if (size <= 0) return Array.Empty<byte>();
+            var output = new List<byte>((int)size);
             uint sector = start;
             int guard = 0;
             while (sector != 0xFFFFFFFEu && sector != 0xFFFFFFFFu && output.Count < size && guard++ < 1 << 20)
@@ -2122,9 +2134,10 @@ namespace ArmorAV
         public static string RecoverSource(byte[] streamData)
         {
             var best = new StringBuilder();
+            int attempts = 0;
             for (int i = 0; i + 1 < streamData.Length && i < 1 << 20; i++)
             {
-                if (streamData[i] != 0x01) continue;
+                if (streamData[i] != 0x01 || attempts++ >= 32) continue;
                 var decompressed = Decompress(streamData, i);
                 if (decompressed.Length < 32) continue;
                 double printable = Util.PrintableRatio(decompressed, decompressed.Length);
@@ -2147,6 +2160,7 @@ namespace ArmorAV
 
         private static readonly string[] DownloadPrimitives =
         { "msxml2.xmlhttp", "winhttp.winhttprequest", "adodb.stream", "urldownloadtofile", "internetopenurl", "xmlhttp" };
+        private const int MaximumRecoveredSourceBytes = 4 * 1024 * 1024;
 
         public static List<DeobHit> Analyze(byte[] data, out string recoveredMacroSource)
         {
@@ -2156,7 +2170,7 @@ namespace ArmorAV
             if (ole == null) return hits;
 
             var sourceBuilder = new StringBuilder();
-            foreach (var entry in ole.Entries)
+            foreach (var entry in ole.Entries.Take(512))
             {
                 var lowerName = entry.Name.ToLowerInvariant();
                 if (entry.Type == 2 && (lowerName.Contains("workbook", StringComparison.Ordinal) || lowerName.Contains("book", StringComparison.Ordinal)))
@@ -2182,7 +2196,10 @@ namespace ArmorAV
                 var raw = ole.Read(entry);
                 if (raw.Length == 0) continue;
                 var src = VbaDecompressor.RecoverSource(raw);
-                if (src.Length > 24) sourceBuilder.Append(src).Append('\n');
+                if (src.Length <= 24) continue;
+                int remaining = MaximumRecoveredSourceBytes - sourceBuilder.Length;
+                if (remaining <= 0) break;
+                sourceBuilder.Append(src, 0, Math.Min(src.Length, remaining)).Append('\n');
             }
 
             recoveredMacroSource = sourceBuilder.ToString();
@@ -2599,7 +2616,6 @@ namespace ArmorAV
         private sealed class Entry
         {
             public long Size;
-            public long Ticks;
             public string Sha256 = "";
             public string Verdict = "";
             public int Score;
@@ -2614,62 +2630,87 @@ namespace ArmorAV
         public ScanCache(string baseDir, bool enabled)
         {
             _enabled = enabled;
-            _path = Path.Combine(baseDir, "armorav-cache.tsv");
+            _path = Path.Combine(baseDir, "armorav-cache-v2.tsv");
             if (!_enabled) return;
             try
             {
                 if (!File.Exists(_path)) return;
-                foreach (var line in File.ReadAllLines(_path))
+                foreach (var line in File.ReadLines(_path))
                 {
-                    var p = line.Split('\t');
-                    if (p.Length < 6) continue;
-                    if (!long.TryParse(p[1], out var size) || !long.TryParse(p[2], out var ticks) || !int.TryParse(p[5], out var score)) continue;
-                    _entries[p[0]] = new Entry { Size = size, Ticks = ticks, Sha256 = p[3], Verdict = p[4], Score = score };
+                    var fields = line.Split('\t');
+                    if (fields.Length != 6 || !string.Equals(fields[5], Product.Version, StringComparison.Ordinal)) continue;
+                    if (!long.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var size) || size < 0 ||
+                        !int.TryParse(fields[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out var score) || score is < 0 or > 100000 ||
+                        !IsSha256(fields[2]) || !Enum.TryParse<Verdict>(fields[3], false, out var parsedVerdict) || !Enum.IsDefined(parsedVerdict)) continue;
+                    string path;
+                    try { path = Encoding.UTF8.GetString(Convert.FromBase64String(fields[0])); }
+                    catch (FormatException) { continue; }
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+                    _entries[path] = new Entry { Size = size, Sha256 = fields[2], Verdict = fields[3], Score = score };
                 }
             }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
 
-        public bool TryGet(string path, long size, long ticks, out string sha256, out string verdict, out int score)
+        public bool TryGet(string path, long size, string sha256, out string verdict, out int score)
         {
-            sha256 = ""; verdict = ""; score = 0;
-            if (!_enabled) return false;
+            verdict = "";
+            score = 0;
+            if (!_enabled || !IsSha256(sha256)) return false;
             lock (_lock)
             {
-                if (!_entries.TryGetValue(path, out var e)) return false;
-                if (e.Size != size || e.Ticks != ticks) return false;
-                sha256 = e.Sha256; verdict = e.Verdict; score = e.Score;
+                if (!_entries.TryGetValue(path, out var entry) || entry.Size != size ||
+                    !string.Equals(entry.Sha256, sha256, StringComparison.OrdinalIgnoreCase)) return false;
+                verdict = entry.Verdict;
+                score = entry.Score;
                 Hits++;
                 return true;
             }
         }
 
-        public void Put(string path, long size, long ticks, string sha256, string verdict, int score)
+        public void Put(string path, long size, string sha256, string verdict, int score)
         {
-            if (!_enabled) return;
+            if (!_enabled || !IsSha256(sha256) || !Enum.TryParse<Verdict>(verdict, false, out var parsedVerdict) || !Enum.IsDefined(parsedVerdict) || score is < 0 or > 100000) return;
             lock (_lock)
-            {
-                _entries[path] = new Entry { Size = size, Ticks = ticks, Sha256 = sha256, Verdict = verdict, Score = score };
-            }
+                _entries[path] = new Entry { Size = size, Sha256 = sha256, Verdict = verdict, Score = score };
         }
 
         public void Save()
         {
             if (!_enabled) return;
+            var temporary = _path + ".tmp-" + Guid.NewGuid().ToString("N");
             try
             {
                 var sb = new StringBuilder();
                 lock (_lock)
                 {
-                    foreach (var kv in _entries)
-                        sb.Append(kv.Key).Append('\t').Append(kv.Value.Size).Append('\t').Append(kv.Value.Ticks).Append('\t')
-                          .Append(kv.Value.Sha256).Append('\t').Append(kv.Value.Verdict).Append('\t').Append(kv.Value.Score).Append('\n');
+                    foreach (var pair in _entries)
+                    {
+                        var encodedPath = Convert.ToBase64String(Encoding.UTF8.GetBytes(pair.Key));
+                        sb.Append(encodedPath).Append('\t').Append(pair.Value.Size.ToString(CultureInfo.InvariantCulture)).Append('\t')
+                          .Append(pair.Value.Sha256).Append('\t').Append(pair.Value.Verdict).Append('\t')
+                          .Append(pair.Value.Score.ToString(CultureInfo.InvariantCulture)).Append('\t').Append(Product.Version).Append('\n');
+                    }
                 }
-                File.WriteAllText(_path, sb.ToString());
+                File.WriteAllText(temporary, sb.ToString());
+                File.Move(temporary, _path, true);
             }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
+            finally
+            {
+                try { if (File.Exists(temporary)) File.Delete(temporary); }
+                catch (IOException) { }
+            }
+        }
+
+        private static bool IsSha256(string value)
+        {
+            if (value.Length != 64) return false;
+            foreach (var character in value)
+                if (!((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F'))) return false;
+            return true;
         }
     }
 
@@ -2748,6 +2789,8 @@ namespace ArmorAV
 
         public static string CsvEscape(string s)
         {
+            var trimmed = s.TrimStart(' ', '\t', '\r', '\n');
+            if (trimmed.Length > 0 && "=+-@".IndexOf(trimmed[0]) >= 0) s = "'" + s;
             if (s.IndexOfAny(new[] { ',', '"', '\n', '\r' }) < 0) return s;
             return "\"" + s.Replace("\"", "\"\"") + "\"";
         }
@@ -2779,25 +2822,30 @@ namespace ArmorAV
     {
         public static HashTriple FromFile(string path)
         {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.SequentialScan);
+            return FromStream(stream);
+        }
+
+        public static HashTriple FromStream(Stream stream)
+        {
+            if (!stream.CanRead) throw new ArgumentException("hash input stream must be readable", nameof(stream));
+            if (stream.CanSeek) stream.Position = 0;
             using var md5 = MD5.Create();
             using var sha1 = SHA1.Create();
             using var sha256 = SHA256.Create();
             var result = new HashTriple();
             var buffer = new byte[1 << 20];
-            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 20, FileOptions.SequentialScan))
+            int read;
+            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
             {
-                int read;
-                while ((read = fs.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    md5.TransformBlock(buffer, 0, read, null, 0);
-                    sha1.TransformBlock(buffer, 0, read, null, 0);
-                    sha256.TransformBlock(buffer, 0, read, null, 0);
-                    result.Length += read;
-                }
-                md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                sha1.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                md5.TransformBlock(buffer, 0, read, null, 0);
+                sha1.TransformBlock(buffer, 0, read, null, 0);
+                sha256.TransformBlock(buffer, 0, read, null, 0);
+                result.Length += read;
             }
+            md5.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            sha1.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             result.Md5 = Util.ToHex(md5.Hash!);
             result.Sha1 = Util.ToHex(sha1.Hash!);
             result.Sha256 = Util.ToHex(sha256.Hash!);
@@ -3602,7 +3650,7 @@ namespace ArmorAV
                     while (q < text.Length && IsB64(text[q])) q++;
                     if (q - p >= 16)
                     {
-                        var decoded = TryB64(text.Substring(p, q - p));
+                        var decoded = TryB64(text.Substring(p, Math.Min(q - p, 1 << 20)));
                         if (decoded != null && decoded.Length >= 4)
                         {
                             string utf16 = Encoding.Unicode.GetString(decoded);
@@ -3990,20 +4038,23 @@ namespace ArmorAV
         private readonly string _dir;
         private readonly string _keyFile;
         private readonly string _indexFile;
-        private readonly object _lock = new object();
+        private readonly object _lock;
+        private static readonly ConcurrentDictionary<string, object> StoreLocks = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         private byte[]? _key;
         private readonly List<QuarantineRecord> _known = new List<QuarantineRecord>();
         private readonly System.Collections.Generic.HashSet<string> _allowlist =
             new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private static readonly byte[] BlobMagic = Encoding.ASCII.GetBytes("AAV1");
+        private static readonly byte[] BlobMagic = Encoding.ASCII.GetBytes("AAV2");
         private const int NonceLength = 12;
         private const int TagLength = 16;
+        private const long MaxQuarantineBytes = 64L * 1024 * 1024;
 
         public QuarantineStore(string baseDir, string? allowlistPath)
         {
             _dir = Path.Combine(baseDir, "quarantine");
             _keyFile = Path.Combine(_dir, "armorav.key");
             _indexFile = Path.Combine(_dir, "known.tsv");
+            _lock = StoreLocks.GetOrAdd(Path.GetFullPath(_dir), _ => new object());
             LoadIndex();
             LoadAllowlist(allowlistPath);
         }
@@ -4050,6 +4101,16 @@ namespace ArmorAV
 
         private static void WriteBytesAtomically(string path, byte[] content)
         {
+            WriteBytesAtomically(path, content, true);
+        }
+
+        private static void WriteNewBytesAtomically(string path, byte[] content)
+        {
+            WriteBytesAtomically(path, content, false);
+        }
+
+        private static void WriteBytesAtomically(string path, byte[] content, bool overwrite)
+        {
             var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
             try
             {
@@ -4058,7 +4119,8 @@ namespace ArmorAV
                     stream.Write(content, 0, content.Length);
                     stream.Flush(true);
                 }
-                File.Move(temporary, path, true);
+                if (overwrite) File.Move(temporary, path, true);
+                else File.Move(temporary, path);
             }
             finally
             {
@@ -4075,7 +4137,7 @@ namespace ArmorAV
                 {
                     if (string.IsNullOrWhiteSpace(line)) continue;
                     var p = line.Split('\t');
-                    if (p.Length < 4) continue;
+                    if (p.Length < 4 || !IsRecordId(p[0]) || !IsSha256(p[1])) continue;
                     _known.Add(new QuarantineRecord { Id = p[0], Sha256 = p[1], Fingerprint = p[2], OriginalPath = p[3] });
                 }
             }
@@ -4134,6 +4196,8 @@ namespace ArmorAV
                 Reasons = reasons.ToList()
             };
             if (dryRun) return rec;
+            if (h.Length > MaxQuarantineBytes)
+                throw new IOException($"refusing to quarantine files larger than {Util.HumanSize(MaxQuarantineBytes)}");
 
             lock (_lock)
             {
@@ -4144,6 +4208,8 @@ namespace ArmorAV
                 try
                 {
 
+                    if (new FileInfo(path).Length != h.Length)
+                        throw new IOException("file changed after it was scanned; refusing to quarantine it");
                     var plain = File.ReadAllBytes(path);
                     var actual = Util.ToHex(SHA256.HashData(plain));
                     if (!string.Equals(actual, h.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -4153,7 +4219,7 @@ namespace ArmorAV
                     var tag = new byte[TagLength];
                     var cipher = new byte[plain.Length];
                     using (var aes = new AesGcm(Key(), TagLength))
-                        aes.Encrypt(nonce, plain, cipher, tag, Encoding.UTF8.GetBytes(rec.Id));
+                        aes.Encrypt(nonce, plain, cipher, tag, MetadataAad(rec.Id, rec.Sha256, rec.OriginalPath));
 
                     var blob = new byte[BlobMagic.Length + nonce.Length + tag.Length + cipher.Length];
                     Buffer.BlockCopy(BlobMagic, 0, blob, 0, BlobMagic.Length);
@@ -4211,13 +4277,28 @@ namespace ArmorAV
         public bool Restore(string id, out string message)
         {
             message = "";
+            if (!IsRecordId(id)) { message = "invalid quarantine item id"; return false; }
             var blobPath = Path.Combine(_dir, id + ".bin");
             var metaPath = Path.Combine(_dir, id + ".json");
             if (!File.Exists(blobPath) || !File.Exists(metaPath)) { message = "quarantine item not found: " + id; return false; }
-            var meta = File.ReadAllText(metaPath);
-            string expected = ReadJson(meta, "sha256");
-            string original = ReadJson(meta, "originalPath");
-            var raw = File.ReadAllBytes(blobPath);
+            try
+            {
+                var info = new FileInfo(blobPath);
+                if (info.Length < BlobMagic.Length + NonceLength + TagLength || info.Length > MaxQuarantineBytes + BlobMagic.Length + NonceLength + TagLength)
+                {
+                    message = "quarantine blob exceeds the safe restore size limit";
+                    return false;
+                }
+                var meta = File.ReadAllText(metaPath);
+                string metadataId = ReadJson(meta, "id");
+                string expected = ReadJson(meta, "sha256");
+                string original = ReadJson(meta, "originalPath");
+                if (!string.Equals(metadataId, id, StringComparison.Ordinal) || !IsSha256(expected) || string.IsNullOrWhiteSpace(original) || !Path.IsPathFullyQualified(original))
+                {
+                    message = "quarantine metadata is invalid";
+                    return false;
+                }
+                var raw = File.ReadAllBytes(blobPath);
             int headerLength = BlobMagic.Length + NonceLength + TagLength;
             if (raw.Length < headerLength || !raw.Take(BlobMagic.Length).SequenceEqual(BlobMagic))
             {
@@ -4236,7 +4317,7 @@ namespace ArmorAV
             try
             {
                 using var aes = new AesGcm(Key(), TagLength);
-                aes.Decrypt(nonce, cipher, tag, plain, Encoding.UTF8.GetBytes(id));
+                aes.Decrypt(nonce, cipher, tag, plain, MetadataAad(id, expected, original));
             }
             catch (CryptographicException)
             {
@@ -4250,14 +4331,18 @@ namespace ArmorAV
                 message = $"integrity check failed, refusing restore (expected {expected}, computed {actual})";
                 return false;
             }
-            if (string.IsNullOrWhiteSpace(original)) { message = "quarantine metadata has no original path"; return false; }
-            if (File.Exists(original)) { message = "refusing to overwrite an existing file: " + original; return false; }
+                if (File.Exists(original)) { message = "refusing to overwrite an existing file: " + original; return false; }
 
-            var dir = Path.GetDirectoryName(original);
-            if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir)) System.IO.Directory.CreateDirectory(dir);
-            WriteBytesAtomically(original, plain);
-            message = "restored " + id + " to " + original;
-            return true;
+                var dir = Path.GetDirectoryName(original);
+                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir)) System.IO.Directory.CreateDirectory(dir);
+                try { WriteNewBytesAtomically(original, plain); }
+                catch (IOException) { message = "refusing to overwrite an existing file: " + original; return false; }
+                message = "restored " + id + " to " + original;
+                return true;
+            }
+            catch (IOException ex) { message = "quarantine read failed: " + ex.Message; return false; }
+            catch (UnauthorizedAccessException ex) { message = "quarantine access denied: " + ex.Message; return false; }
+            catch (JsonException) { message = "quarantine metadata is invalid"; return false; }
         }
 
         public List<QuarantineRecord> List()
@@ -4269,34 +4354,50 @@ namespace ArmorAV
                 try
                 {
                     var meta = File.ReadAllText(f);
+                    var id = ReadJson(meta, "id");
+                    var sha256 = ReadJson(meta, "sha256");
+                    if (!IsRecordId(id) || !IsSha256(sha256)) continue;
                     list.Add(new QuarantineRecord
                     {
-                        Id = ReadJson(meta, "id"),
+                        Id = id,
                         OriginalPath = ReadJson(meta, "originalPath"),
-                        Sha256 = ReadJson(meta, "sha256"),
+                        Sha256 = sha256,
                         TimestampUtc = ReadJson(meta, "timestampUtc")
                     });
                 }
                 catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                catch (JsonException) { }
             }
             return list.OrderBy(x => x.TimestampUtc, StringComparer.Ordinal).ToList();
         }
 
+        private static byte[] MetadataAad(string id, string sha256, string originalPath)
+        {
+            return Encoding.UTF8.GetBytes(id + "\n" + sha256 + "\n" + originalPath);
+        }
+
+        private static bool IsRecordId(string value)
+        {
+            if (value.Length != 32) return false;
+            foreach (var character in value)
+                if (!((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f'))) return false;
+            return true;
+        }
+
+        private static bool IsSha256(string value)
+        {
+            if (value.Length != 64) return false;
+            foreach (var character in value)
+                if (!((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F'))) return false;
+            return true;
+        }
+
         private static string ReadJson(string json, string key)
         {
-            var marker = "\"" + key + "\":";
-            int i = json.IndexOf(marker, StringComparison.Ordinal);
-            if (i < 0) return "";
-            int q1 = json.IndexOf('"', i + marker.Length);
-            if (q1 < 0) return "";
-            var sb = new StringBuilder();
-            for (int p = q1 + 1; p < json.Length; p++)
-            {
-                if (json[p] == '\\' && p + 1 < json.Length) { sb.Append(json[p + 1] == 'n' ? '\n' : json[p + 1]); p++; continue; }
-                if (json[p] == '"') break;
-                sb.Append(json[p]);
-            }
-            return sb.ToString();
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty(key, out var property) || property.ValueKind != JsonValueKind.String) return "";
+            return property.GetString() ?? "";
         }
     }
 
@@ -4338,6 +4439,8 @@ namespace ArmorAV
             new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _visitLock = new object();
         private const int DeepAnalysisCap = 8 * 1024 * 1024;
+        private const int MaximumQueuedFiles = 100000;
+        private bool _fileLimitReached;
 
         public ScanEngine(Options opt, ScanReport report, QuarantineStore store, ScanCache cache)
         {
@@ -4359,6 +4462,7 @@ namespace ArmorAV
                     ScanFile(f);
                     if (_opt.FailFast && _report.ResultsBag.Any(r => r.VerdictText == Verdict.Confirmed.ToString())) state.Stop();
                 }
+                catch (OutOfMemoryException) { throw; }
                 catch (Exception ex) { _report.SkippedBag.Add(new SkippedFile { Path = f, Reason = ex.GetType().Name + ": " + ex.Message }); }
             });
             Correlate();
@@ -4407,6 +4511,7 @@ namespace ArmorAV
 
         private void Collect(string dir, int depth, List<string> files)
         {
+            if (_fileLimitReached) return;
             if (depth > _opt.MaxDepth)
             {
                 _report.SkippedBag.Add(new SkippedFile { Path = dir, Reason = $"traversal depth limit {_opt.MaxDepth} exceeded" });
@@ -4435,6 +4540,12 @@ namespace ArmorAV
                         {
                             _report.SkippedBag.Add(new SkippedFile { Path = f, Reason = $"file larger than limit ({Util.HumanSize(fi.Length)})" });
                             continue;
+                        }
+                        if (files.Count >= MaximumQueuedFiles)
+                        {
+                            _fileLimitReached = true;
+                            _report.SkippedBag.Add(new SkippedFile { Path = real, Reason = $"file queue limit {MaximumQueuedFiles} reached" });
+                            return;
                         }
                         files.Add(f);
                     }
@@ -4485,33 +4596,31 @@ namespace ArmorAV
             var result = new FileResult { Path = real };
             try
             {
-                long cachedTicks = 0;
-                try { cachedTicks = File.GetLastWriteTimeUtc(real).Ticks; } catch (IOException) { }
+                using var scanLock = new FileStream(real, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.SequentialScan);
+                var hashes = Hasher.FromStream(scanLock);
                 var fileLength = new FileInfo(real).Length;
-                if (_cache.TryGet(real, fileLength, cachedTicks, out var cSha, out var cVerdict, out var cScore))
+                if (fileLength != hashes.Length)
+                    throw new IOException("file changed while its content was being hashed");
+                result.Size = hashes.Length;
+                result.Md5 = hashes.Md5;
+                result.Sha1 = hashes.Sha1;
+                result.Sha256 = hashes.Sha256;
+                if (_store.IsAllowlisted(hashes))
                 {
-                    result.Size = fileLength;
-                    result.Sha256 = cSha;
-                    result.VerdictText = cVerdict;
-                    result.Score = cScore;
-                    result.FromCache = true;
-                    result.FileType = "cached";
+                    result.VerdictText = "Clean";
+                    result.QuarantineNote = "hash allowlisted";
                     sw.Stop();
                     result.ScanMilliseconds = sw.Elapsed.TotalMilliseconds;
                     _report.ResultsBag.Add(result);
                     return;
                 }
 
-                var hashes = Hasher.FromFile(real);
-                result.Size = hashes.Length;
-                result.Md5 = hashes.Md5;
-                result.Sha1 = hashes.Sha1;
-                result.Sha256 = hashes.Sha256;
-
-                if (_store.IsAllowlisted(hashes))
+                if (_cache.TryGet(real, hashes.Length, hashes.Sha256, out var cachedVerdict, out var cachedScore))
                 {
-                    result.VerdictText = "Clean";
-                    result.QuarantineNote = "hash allowlisted";
+                    result.VerdictText = cachedVerdict;
+                    result.Score = cachedScore;
+                    result.FromCache = true;
+                    result.FileType = "cached";
                     sw.Stop();
                     result.ScanMilliseconds = sw.Elapsed.TotalMilliseconds;
                     _report.ResultsBag.Add(result);
@@ -4591,10 +4700,12 @@ namespace ArmorAV
 
                 if (type.IsZipContainer) ScanZipFile(real, result, 0);
 
+                scanLock.Dispose();
                 Finalize(result, real, hashes);
             }
             catch (UnauthorizedAccessException ex) { _report.SkippedBag.Add(new SkippedFile { Path = real, Reason = "access denied: " + ex.Message }); return; }
             catch (IOException ex) { _report.SkippedBag.Add(new SkippedFile { Path = real, Reason = "io error: " + ex.Message }); return; }
+            catch (OutOfMemoryException) { throw; }
             catch (Exception ex) { _report.SkippedBag.Add(new SkippedFile { Path = real, Reason = ex.GetType().Name + ": " + ex.Message }); return; }
 
             sw.Stop();
@@ -4648,11 +4759,7 @@ namespace ArmorAV
             result.Techniques = AttackMap.Collect(result.Families);
             result.Findings = result.Findings.OrderByDescending(f => f.Weight).ThenBy(f => f.Name, StringComparer.Ordinal).ToList();
 
-            try
-            {
-                long ticks = File.GetLastWriteTimeUtc(real).Ticks;
-                _cache.Put(real, hashes.Length, ticks, hashes.Sha256, result.VerdictText, result.Score);
-            }
+            try { _cache.Put(real, hashes.Length, hashes.Sha256, result.VerdictText, result.Score); }
             catch (IOException) { }
 
             if (verdict == Verdict.Confirmed)
@@ -4666,6 +4773,7 @@ namespace ArmorAV
                         ? $"moved to quarantine, id {rec.Id}"
                         : "dry-run: would be quarantined (pass --quarantine to move)";
                 }
+                catch (OutOfMemoryException) { throw; }
                 catch (Exception ex) { result.QuarantineNote = "quarantine failed: " + ex.Message; }
             }
         }
@@ -4703,7 +4811,7 @@ namespace ArmorAV
             var session = new PatternEngine.Session();
             int overlap = PatternEngine.Overlap;
             var buffer = new byte[Math.Max(1 << 20, overlap * 4)];
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 20, FileOptions.SequentialScan);
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.SequentialScan);
             int carry = 0;
             long baseOffset = 0;
             int read;
@@ -4729,7 +4837,7 @@ namespace ArmorAV
 
         private static byte[] ReadHead(string path, int cap)
         {
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 20, FileOptions.SequentialScan);
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.SequentialScan);
             int len = (int)Math.Min(cap, fs.Length);
             var buf = new byte[len];
             int off = 0;
@@ -4897,7 +5005,7 @@ namespace ArmorAV
         {
             try
             {
-                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
                 ScanZipStream(fs, result, depth, Path.GetFileName(path));
             }
             catch (InvalidDataException ex) { _report.SkippedBag.Add(new SkippedFile { Path = path, Reason = "invalid zip container: " + ex.Message }); }
@@ -4918,7 +5026,9 @@ namespace ArmorAV
                 return;
             }
 
-            long totalCompressed = 0, totalDecompressed = 0;
+            long declaredCompressed = 0;
+            long declaredDecompressed = 0;
+            long observedDecompressed = 0;
             foreach (var entry in zip.Entries)
             {
                 if (IsTraversal(entry.FullName))
@@ -4931,57 +5041,55 @@ namespace ArmorAV
                 if (entry.Name.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
                     Add(result, "Archive.LnkDropper", $"{label}: archive delivers a shortcut file '{entry.Name}'");
                 if (entry.Length == 0 && entry.CompressedLength == 0) continue;
-
-                totalCompressed += entry.CompressedLength;
-                totalDecompressed += entry.Length;
-                if (totalDecompressed > _opt.MaxDecompressedBytes)
+                if (entry.Length < 0 || entry.CompressedLength < 0 || entry.Length > _opt.MaxDecompressedBytes - declaredDecompressed)
                 {
-                    Add(result, "Archive.ZipBombTotalSize", $"{label}: cumulative decompressed size {Util.HumanSize(totalDecompressed)} exceeds the cap {Util.HumanSize(_opt.MaxDecompressedBytes)}");
+                    Add(result, "Archive.ZipBombTotalSize", $"{label}: declared decompressed size exceeds the cap {Util.HumanSize(_opt.MaxDecompressedBytes)}");
                     return;
                 }
+                declaredDecompressed += entry.Length;
+                if (entry.CompressedLength > long.MaxValue - declaredCompressed) declaredCompressed = long.MaxValue;
+                else declaredCompressed += entry.CompressedLength;
                 long ratio = entry.CompressedLength > 0 ? entry.Length / entry.CompressedLength : 0;
                 if (ratio > 100)
                 {
                     Add(result, "Archive.ZipBombRatio", $"{label}: entry '{entry.FullName}' expands {ratio}:1, above the 100:1 limit");
                     continue;
                 }
+                if (observedDecompressed >= _opt.MaxDecompressedBytes)
+                {
+                    Add(result, "Archive.ZipBombTotalSize", $"{label}: observed decompressed data reached the cap {Util.HumanSize(_opt.MaxDecompressedBytes)}");
+                    return;
+                }
 
                 byte[] data;
                 try
                 {
-                    using var es = entry.Open();
-                    using var ms = new MemoryStream();
-                    var buf = new byte[1 << 20];
-                    long copied = 0;
-                    int r;
-                    while ((r = es.Read(buf, 0, buf.Length)) > 0)
-                    {
-                        copied += r;
-                        if (copied > _opt.MaxDecompressedBytes) break;
-                        ms.Write(buf, 0, r);
-                    }
-                    data = ms.ToArray();
+                    using var entryStream = entry.Open();
+                    data = ReadArchiveEntry(entryStream, _opt.MaxDecompressedBytes - observedDecompressed, out var consumed, out var truncated, out var patternHits);
+                    observedDecompressed += consumed;
+                    foreach (var hit in patternHits)
+                        result.Findings.Add(new Finding
+                        {
+                            Name = hit.Signature.Name,
+                            Weight = hit.Signature.Weight,
+                            Detector = "archive",
+                            Family = hit.Signature.Family,
+                            Severity = hit.Signature.Severity,
+                            Detail = $"{label}!{entry.FullName} at offset {hit.Offset}"
+                        });
+                    if (truncated)
+                        Add(result, "Archive.EntryAnalysisTruncated", $"{label}: entry '{entry.FullName}' reached the decompression safety budget");
                 }
+                catch (OutOfMemoryException) { throw; }
                 catch (Exception ex)
                 {
                     if (FileTyper.IsExecutableExtension(entry.Name))
-                        Add(result, "Archive.UnsupportedCompressedExecutable",
-                            $"{label}: entry '{entry.FullName}' uses an unsupported compression method ({ex.GetType().Name}) and carries an executable extension");
+                        Add(result, "Archive.EncryptedEntryWithExecutable",
+                            $"{label}: entry '{entry.FullName}' could not be decompressed ({ex.GetType().Name}) and carries an executable extension");
                     else
-                        _report.SkippedBag.Add(new SkippedFile { Path = label + "!" + entry.FullName, Reason = "unsupported compression method: " + ex.Message });
+                        _report.SkippedBag.Add(new SkippedFile { Path = label + "!" + entry.FullName, Reason = "archive entry could not be read: " + ex.Message });
                     continue;
                 }
-
-                foreach (var hit in PatternEngine.ScanBuffer(data))
-                    result.Findings.Add(new Finding
-                    {
-                        Name = hit.Signature.Name,
-                        Weight = hit.Signature.Weight,
-                        Detector = "archive",
-                        Family = hit.Signature.Family,
-                        Severity = hit.Signature.Severity,
-                        Detail = $"{label}!{entry.FullName} at offset {hit.Offset}"
-                    });
 
                 foreach (var h in DocumentAnalyzer.AnalyzeOoxmlEntry(entry.FullName, data, data.Length)) Add(result, h.Key, h.Detail);
 
@@ -4991,7 +5099,7 @@ namespace ArmorAV
                 if (entry.Name.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
                     foreach (var h in LnkAnalyzer.Analyze(data, data.Length)) Add(result, h.Key, $"{label}!{entry.FullName}: {h.Detail}");
 
-                foreach (var s in ShellcodeHeuristics.Analyze(data, data.Length)) Add(result, s.Key, $"{label}!{entry.FullName}: {s.Detail}");
+                foreach (var shellcodeHit in ShellcodeHeuristics.Analyze(data, data.Length)) Add(result, shellcodeHit.Key, $"{label}!{entry.FullName}: {shellcodeHit.Detail}");
 
                 AnalyzePe(data, result, label + "!" + entry.FullName);
 
@@ -5001,9 +5109,42 @@ namespace ArmorAV
                     try { ScanZipStream(nested, result, depth + 1, label + "!" + entry.FullName); }
                     catch (InvalidDataException) { }
                 }
+                if (observedDecompressed >= _opt.MaxDecompressedBytes)
+                {
+                    Add(result, "Archive.ZipBombTotalSize", $"{label}: observed decompressed data reached the cap {Util.HumanSize(_opt.MaxDecompressedBytes)}");
+                    return;
+                }
             }
-            if (totalCompressed > 0 && totalDecompressed / totalCompressed > 100)
-                Add(result, "Archive.ZipBombRatio", $"{label}: aggregate expansion {totalDecompressed / totalCompressed}:1 exceeds the 100:1 limit");
+            if (declaredCompressed > 0 && declaredDecompressed / declaredCompressed > 100)
+                Add(result, "Archive.ZipBombRatio", $"{label}: aggregate expansion {declaredDecompressed / declaredCompressed}:1 exceeds the 100:1 limit");
+        }
+
+        private static byte[] ReadArchiveEntry(Stream stream, long budget, out long consumed, out bool truncated, out List<PatternHit> patternHits)
+        {
+            var session = new PatternEngine.Session();
+            var buffer = new byte[Math.Max(1 << 20, PatternEngine.Overlap * 4)];
+            using var prefix = new MemoryStream();
+            int carry = 0;
+            long baseOffset = 0;
+            consumed = 0;
+            while (consumed < budget)
+            {
+                int allowed = (int)Math.Min(buffer.Length - carry, budget - consumed);
+                if (allowed <= 0) break;
+                int read = stream.Read(buffer, carry, allowed);
+                if (read <= 0) break;
+                int total = carry + read;
+                session.Feed(buffer, total, baseOffset);
+                int prefixBytes = (int)Math.Min(read, DeepAnalysisCap - prefix.Length);
+                if (prefixBytes > 0) prefix.Write(buffer, carry, prefixBytes);
+                consumed += read;
+                carry = Math.Min(PatternEngine.Overlap, total);
+                Buffer.BlockCopy(buffer, total - carry, buffer, 0, carry);
+                baseOffset += total - carry;
+            }
+            truncated = consumed >= budget && stream.ReadByte() >= 0;
+            patternHits = session.Results();
+            return prefix.ToArray();
         }
 
         private static bool IsTraversal(string entryName)
@@ -5455,8 +5596,9 @@ namespace ArmorAV
                 }
             }
             if (!o.Restore && !o.ListQuarantine && string.IsNullOrEmpty(o.Path)) return null;
-            if (o.MaxDepth < 0 || o.MaxNestedArchiveDepth < 0 || o.MaxDecompressedBytes < 1 ||
-                o.MaxArchiveEntries < 1 || o.MaxFileBytes < 1 || o.MinScore < 0) return null;
+            if (o.MaxDepth is < 0 or > 100 || o.Threads is < 1 or > 64 || o.MaxNestedArchiveDepth is < 0 or > 16 ||
+                o.MaxDecompressedBytes is < 1 or > 2L * 1024 * 1024 * 1024 || o.MaxArchiveEntries is < 1 or > 100000 ||
+                o.MaxFileBytes < 1 || o.MinScore < 0) return null;
             return o;
         }
 
