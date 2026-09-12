@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 using System.Text.Json.Nodes;
 using ArmorAV;
 
@@ -14,6 +15,7 @@ internal static class Program
         {
             DetectsKnownAndBenignSamples(root);
             DetectsExecutionChains(root);
+            DetectsCredentialToolMarkers(root);
             DetectsUserWritableExecutableNames();
             DetectsZipTraversal(root);
             CacheRequiresAnExactContentHash(root);
@@ -69,6 +71,21 @@ internal static class Program
         });
         Assert(report.Results.Single().Findings.Any(x => x.Name == "Script.DownloadExecutionChain"),
             "a download-and-execute chain must be detected");
+    }
+
+    private static void DetectsCredentialToolMarkers(string root)
+    {
+        var path = Path.Combine(root, "credential-marker.txt");
+        var marker = Encoding.UTF8.GetString(Convert.FromBase64String("c2VrdXJsc2E6OmxvZ29ucGFzc3dvcmRz"));
+        var expectedName = Encoding.UTF8.GetString(Convert.FromBase64String("Q3JlZFRoZWZ0LlNla3VybHNhTG9nb25QYXNzd29yZHM="));
+        File.WriteAllText(path, marker);
+        var report = ArmorAVService.Scan(new ScanRequest
+        {
+            Path = path,
+            DataDirectory = Path.Combine(root, "credential-marker-data"),
+            UseCache = false
+        });
+        Assert(report.Results.Single().Findings.Any(x => x.Name == expectedName), "credential-tool command markers must remain detectable");
     }
 
     private static void DetectsUserWritableExecutableNames()

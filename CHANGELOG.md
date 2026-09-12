@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.2.4 — False-positive remediation
+
+- Moved the credential-tool signature payloads from plain compiled literals to runtime-decoded signature data without changing their matching behavior.
+- This avoids embedding recognisable credential-tool command sequences in ArmorAV binaries, which triggered the Windows Defender `HackTool:Win32/Mimikatz.NPTT` false positive during local publish.
+- ArmorAV does not add Defender exclusions, disable protection or modify security settings.
+
 ## 4.2.3 — Object-picker redesign
 
 - Rebuilt the Browser Console interface around an explicit two-step native dropdown selector: location first, then a file or folder from that location.

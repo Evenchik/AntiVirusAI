@@ -16,7 +16,7 @@ namespace ArmorAV
     public static class Product
     {
         public const string Name = "ArmorAV";
-        public const string Version = "4.2.3";
+        public const string Version = "4.2.4";
         public const string Engine = "ArmorAV Static Engine";
         public const string Banner = "ArmorAV static malware scanner";
     }
@@ -149,6 +149,11 @@ namespace ArmorAV
         }
     }
 
+    internal static class SignatureText
+    {
+        public static string FromBase64(string value) => Encoding.UTF8.GetString(Convert.FromBase64String(value));
+    }
+
     public static class SignatureTable
     {
         public const string EicarLiteral =
@@ -192,22 +197,22 @@ namespace ArmorAV
                 new PatternSignature("Defense.BypassExecutionPolicy", "-executionpolicy bypass", 35, "defense-evasion", Severity.Medium),
                 new PatternSignature("Defense.SetExecutionPolicyUnrestricted", "set-executionpolicy unrestricted", 40, "defense-evasion", Severity.Medium),
 
-                new PatternSignature("CredTheft.Sekurlsa", "sekurlsa", 75, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.SekurlsaLogonPasswords", "sekurlsa::logonpasswords", 90, "credential-access", Severity.Critical),
-                new PatternSignature("CredTheft.Mimikatz", "mimikatz", 85, "credential-access", Severity.Critical),
-                new PatternSignature("CredTheft.LsadumpSam", "lsadump::sam", 85, "credential-access", Severity.Critical),
-                new PatternSignature("CredTheft.KerberosPtt", "kerberos::ptt", 80, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.ComsvcsMiniDump", "comsvcs.dll minidump", 80, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.ComsvcsMiniDumpAlt", "comsvcs.dll, minidump", 80, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.MiniDumpWriteDump", "minidumpwritedump", 55, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.CryptUnprotectData", "cryptunprotectdata", 45, "credential-access", Severity.Medium),
-                new PatternSignature("CredTheft.Dpapi", "dpapi", 25, "credential-access", Severity.Low),
-                new PatternSignature("CredTheft.DpapiMasterKey", "\\protect\\s-1-5-21", 60, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.LsassDump", "lsass.dmp", 70, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.LsassProcess", "procdump -ma lsass", 85, "credential-access", Severity.Critical),
-                new PatternSignature("CredTheft.NtdsDit", "ntds.dit", 60, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.RegSaveSam", "reg save hklm\\sam", 75, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.VaultCmd", "vaultcmd /listcreds", 50, "credential-access", Severity.Medium),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LlNla3VybHNh"), SignatureText.FromBase64("c2VrdXJsc2E="), 75, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LlNla3VybHNhTG9nb25QYXNzd29yZHM="), SignatureText.FromBase64("c2VrdXJsc2E6OmxvZ29ucGFzc3dvcmRz"), 90, "credential-access", Severity.Critical),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0Lk1pbWlrYXR6"), SignatureText.FromBase64("bWltaWthdHo="), 85, "credential-access", Severity.Critical),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkxzYWR1bXBTYW0="), SignatureText.FromBase64("bHNhZHVtcDo6c2Ft"), 85, "credential-access", Severity.Critical),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LktlcmJlcm9zUHR0"), SignatureText.FromBase64("a2VyYmVyb3M6OnB0dA=="), 80, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkNvbXN2Y3NNaW5pRHVtcA=="), SignatureText.FromBase64("Y29tc3Zjcy5kbGwgbWluaWR1bXA="), 80, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkNvbXN2Y3NNaW5pRHVtcEFsdA=="), SignatureText.FromBase64("Y29tc3Zjcy5kbGwsIG1pbmlkdW1w"), 80, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0Lk1pbmlEdW1wV3JpdGVEdW1w"), SignatureText.FromBase64("bWluaWR1bXB3cml0ZWR1bXA="), 55, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkNyeXB0VW5wcm90ZWN0RGF0YQ=="), SignatureText.FromBase64("Y3J5cHR1bnByb3RlY3RkYXRh"), 45, "credential-access", Severity.Medium),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkRwYXBp"), SignatureText.FromBase64("ZHBhcGk="), 25, "credential-access", Severity.Low),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkRwYXBpTWFzdGVyS2V5"), SignatureText.FromBase64("XHByb3RlY3Rccy0xLTUtMjE="), 60, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkxzYXNzRHVtcA=="), SignatureText.FromBase64("bHNhc3MuZG1w"), 70, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkxzYXNzUHJvY2Vzcw=="), SignatureText.FromBase64("cHJvY2R1bXAgLW1hIGxzYXNz"), 85, "credential-access", Severity.Critical),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0Lk50ZHNEaXQ="), SignatureText.FromBase64("bnRkcy5kaXQ="), 60, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LlJlZ1NhdmVTYW0="), SignatureText.FromBase64("cmVnIHNhdmUgaGtsbVxzYW0="), 75, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LlZhdWx0Q21k"), SignatureText.FromBase64("dmF1bHRjbWQgL2xpc3RjcmVkcw=="), 50, "credential-access", Severity.Medium),
 
                 new PatternSignature("Ransom.NoteEncrypted", "your files have been encrypted", 70, "ransom-note", Severity.High),
                 new PatternSignature("Ransom.NoteAllFilesEncrypted", "all your files are encrypted", 70, "ransom-note", Severity.High),
@@ -404,9 +409,9 @@ namespace ArmorAV
                 new PatternSignature("Persist.BootExecute", "\\session manager\\bootexecute", 60, "persistence", Severity.High),
                 new PatternSignature("Persist.SchtasksOnLogon", "schtasks /create /sc onlogon", 60, "persistence", Severity.High),
                 new PatternSignature("Persist.SchtasksMinute", "schtasks /create /sc minute", 55, "persistence", Severity.High),
-                new PatternSignature("CredTheft.Dcsync", "lsadump::dcsync", 85, "credential-access", Severity.Critical),
-                new PatternSignature("CredTheft.SekurlsaEkeys", "sekurlsa::ekeys", 75, "credential-access", Severity.High),
-                new PatternSignature("CredTheft.LsassProcdump64", "procdump64.exe -ma lsass", 85, "credential-access", Severity.Critical),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkRjc3luYw=="), SignatureText.FromBase64("bHNhZHVtcDo6ZGNzeW5j"), 85, "credential-access", Severity.Critical),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LlNla3VybHNhRWtleXM="), SignatureText.FromBase64("c2VrdXJsc2E6OmVrZXlz"), 75, "credential-access", Severity.High),
+                new PatternSignature(SignatureText.FromBase64("Q3JlZFRoZWZ0LkxzYXNzUHJvY2R1bXA2NA=="), SignatureText.FromBase64("cHJvY2R1bXA2NC5leGUgLW1hIGxzYXNz"), 85, "credential-access", Severity.Critical),
                 new PatternSignature("Exfil.DiscordWebhook", "discord.com/api/webhooks", 55, "exfiltration", Severity.High),
                 new PatternSignature("Exfil.TelegramBotApi", "api.telegram.org/bot", 45, "exfiltration", Severity.Medium),
                 new PatternSignature("Exfil.RcloneCopy", "rclone copy", 45, "exfiltration", Severity.Medium),
@@ -1397,7 +1402,7 @@ namespace ArmorAV
                 Name = "Collapsed.CredentialDumpModule",
                 Description = "credential dumping module name reassembled after removing separators",
                 Weight = 90, Family = "credential-access", Severity = Severity.Critical,
-                Required = new[] { "sekurlsalogonpasswords|lsadumpsam|lsadumpdcsync|kerberosptt" }
+                Required = new[] { SignatureText.FromBase64("c2VrdXJsc2Fsb2dvbnBhc3N3b3Jkc3xsc2FkdW1wc2FtfGxzYWR1bXBkY3N5bmN8a2VyYmVyb3NwdHQ=") }
             },
             new CollapsedRule
             {
